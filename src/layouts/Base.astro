@@ -8,22 +8,65 @@ const { title = "LLM Circuits" } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet" />
+    <script is:inline>
+      (function() {
+        const saved = localStorage.getItem('llm-circuits:theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body class="min-h-screen">
-    <header class="border-b border-slate-800 px-6 py-3">
+    <header class="border-b border-stone-200 bg-white/90 px-6 py-3 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-950/90">
       <nav class="mx-auto flex max-w-6xl items-center justify-between text-sm">
-        <a href="/" class="font-bold tracking-wide">⚡ LLM Circuits</a>
-        <div class="flex gap-4 text-slate-400">
-          <a href="/" class="hover:text-slate-100">Playground</a>
-          <a href="/blog/blogpost" class="hover:text-slate-100">Blog</a>
+        <a href="/" class="font-bold tracking-wide" style="font-family: 'Chakra Petch', monospace;">
+          <span style="color: #f6821f;">⚡</span> LLM Circuits
+        </a>
+        <div class="flex items-center gap-4 text-stone-500 dark:text-stone-400">
+          <a href="/" class="transition-colors hover:text-[#f6821f]">Playground</a>
+          <a href="/blog/blogpost" class="transition-colors hover:text-[#f6821f]">Blog</a>
+          <button
+            id="theme-toggle"
+            aria-label="Toggle dark mode"
+            class="rounded p-1.5 text-stone-400 transition-colors hover:text-[#f6821f] dark:text-stone-500"
+          >
+            <!-- sun: shown in dark mode -->
+            <svg class="hidden dark:block" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="4"/>
+              <line x1="12" y1="20" x2="12" y2="22"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="2" y1="12" x2="4" y2="12"/>
+              <line x1="20" y1="12" x2="22" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <!-- moon: shown in light mode -->
+            <svg class="block dark:hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
         </div>
       </nav>
     </header>
     <main class="mx-auto max-w-6xl px-6 py-6">
       <slot />
     </main>
-    <footer class="mx-auto max-w-6xl px-6 py-8 text-xs text-slate-500">
+    <footer class="mx-auto max-w-6xl px-6 py-8 text-xs text-stone-400 dark:text-stone-600">
       Built on Cloudflare Workers AI · models run server-side via the AI binding.
     </footer>
+    <script is:inline>
+      document.getElementById('theme-toggle').addEventListener('click', function() {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        localStorage.setItem('llm-circuits:theme', isDark ? 'dark' : 'light');
+      });
+    </script>
   </body>
 </html>

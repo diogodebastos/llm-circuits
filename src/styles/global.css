@@ -1,27 +1,40 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-:root {
-  color-scheme: dark;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-wire: #7dd3fc;
-  --color-node: #0f172a;
-  --color-spark: #fbbf24;
+  --color-wire: #f6821f;
+  --color-node: #ffffff;
+  --color-spark: #f6821f;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 html, body {
-  background-color: #020617;
-  color: #f1f5f9;
+  background-color: #faf9f6;
+  background-image: radial-gradient(#f6821f22 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: #1c1816;
   font-family: var(--font-mono);
+}
+
+html.dark body {
+  background-color: #0c0a09;
+  background-image: radial-gradient(#f6821f18 1px, transparent 1px);
+  color: #f5f5f4;
 }
 
 .react-flow__node-modelNode {
   border-radius: 0.375rem;
-  border: 1px solid #334155;
-  background-color: #0f172a;
-  color: #f1f5f9;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4);
+  border: 1px solid #e5ded7;
+  background-color: #ffffff;
+  color: #1c1816;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+
+html.dark .react-flow__node-modelNode {
+  border-color: #44403c;
+  background-color: #1c1917;
+  color: #f5f5f4;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
 }
