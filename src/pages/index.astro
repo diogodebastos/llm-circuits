@@ -3,11 +3,31 @@ import Base from "../layouts/Base.astro";
 import CircuitCanvas from "../components/CircuitCanvas.tsx";
 ---
 <Base title="LLM Circuits — Playground">
-  <section class="mb-6">
-    <h1 class="text-2xl font-bold" style="font-family: 'Chakra Petch', monospace;">Wire LLMs like resistors.</h1>
-    <p class="mt-2 max-w-3xl text-stone-500 dark:text-stone-400">
-      Pick a preset (2 LLMs in series, or 2 in parallel), drag in more "resistors" (each model has a mock resistance proportional to its parameter count), and apply current — your prompt — to run. Switch interpretation modes to see the same circuit behave differently.
-    </p>
+  <section class="mb-5">
+    <div class="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-stone-400 dark:text-stone-600">
+      <span style="color: #f6821f;">●</span>
+      <span>Circuit Playground</span>
+      <span class="text-stone-300 dark:text-stone-700">/</span>
+      <span>Interactive</span>
+    </div>
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-[22px] font-bold leading-tight tracking-tight text-stone-900 dark:text-stone-100"
+            style="font-family: 'Chakra Petch', monospace;">
+          Wire LLMs like resistors.
+        </h1>
+        <p class="mt-1.5 max-w-2xl text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+          Pick a preset · drag components onto the canvas · connect nodes · apply current (your prompt) to run.
+          Series refines, parallel votes. Resistance ∝ parameter count.
+        </p>
+      </div>
+      <dl class="hidden xl:grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 rounded border border-stone-200 px-4 py-3 text-[10px] text-stone-400 dark:border-stone-800 dark:text-stone-600">
+        <dt class="flex items-center gap-1.5"><span style="color:#f6821f;">⊡</span> Resistor</dt><dd>LLM model node</dd>
+        <dt class="flex items-center gap-1.5"><span style="color:#0ea5e9;">⊓</span> Capacitor</dt><dd>Memory / context seed</dd>
+        <dt class="flex items-center gap-1.5"><span style="color:#a78bfa;">∿</span> Inductor</dt><dd>Self-vote stabilizer</dd>
+        <dt class="flex items-center gap-1.5"><span style="color:#f6821f;">⚡</span> Voltage</dt><dd>Your prompt</dd>
+      </dl>
+    </div>
   </section>
   <CircuitCanvas client:only="react" />
 </Base>

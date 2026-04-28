@@ -8,20 +8,177 @@
   --color-node: #ffffff;
   --color-spark: #f6821f;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Chakra Petch", monospace;
 }
 
 html, body {
   background-color: #faf9f6;
-  background-image: radial-gradient(#f6821f22 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image:
+    linear-gradient(#f6821f0a 1px, transparent 1px),
+    linear-gradient(90deg, #f6821f0a 1px, transparent 1px),
+    radial-gradient(#f6821f22 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px;
   color: #1c1816;
   font-family: var(--font-mono);
 }
 
 html.dark body {
   background-color: #0c0a09;
-  background-image: radial-gradient(#f6821f18 1px, transparent 1px);
+  background-image:
+    linear-gradient(#f6821f06 1px, transparent 1px),
+    linear-gradient(90deg, #f6821f06 1px, transparent 1px),
+    radial-gradient(#f6821f18 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px;
   color: #f5f5f4;
+}
+
+/* ── Animations ── */
+
+@keyframes spin-cw {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes signal-scan {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes node-pulse {
+  from { box-shadow: 0 0 0 2px #f6821f88, 0 0 8px #f6821f22; }
+  to   { box-shadow: 0 0 0 2px #f6821f, 0 0 16px #f6821f55; }
+}
+
+.animate-spin-cw { animation: spin-cw 0.8s linear infinite; }
+
+.animate-scan {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #f6821f33 45%,
+    #f6821f66 50%,
+    #f6821f33 55%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: signal-scan 1.4s ease-in-out infinite;
+}
+
+/* ── Node status rings ── */
+
+.node-running { animation: node-pulse 1s ease-in-out infinite alternate; }
+.node-done    { box-shadow: 0 0 0 2px #10b981, 0 0 8px #10b98122; }
+.node-error   { box-shadow: 0 0 0 2px #f43f5e, 0 0 8px #f43f5e22; }
+
+/* ── Sidebar section dividers ── */
+
+.sidebar-section { padding-top: 14px; border-top: 1px solid #e7e0d8; }
+html.dark .sidebar-section { border-top-color: #292524; }
+.sidebar-section:first-child { border-top: none; padding-top: 0; }
+
+/* ── Canvas empty state ── */
+
+.canvas-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  color: #a8a29e;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.canvas-empty-hint__symbol { font-size: 40px; opacity: 0.15; line-height: 1; }
+
+/* ── R_total stat callout ── */
+
+.stat-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 16px;
+  border: 1px solid #f6821f44;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #f6821f08 0%, transparent 60%);
+}
+
+html.dark .stat-callout {
+  border-color: #f6821f33;
+  background: linear-gradient(135deg, #f6821f0c 0%, transparent 60%);
+}
+
+.stat-callout__label {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a8a29e;
+}
+
+.stat-callout__value {
+  font-size: 22px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #f6821f;
+  line-height: 1.1;
+}
+
+.stat-callout__unit {
+  font-size: 11px;
+  color: #a8a29e;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+/* ── React Flow panel overrides ── */
+
+.react-flow__controls {
+  border: 1px solid #e7e0d8 !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  background: #faf9f6 !important;
+  overflow: hidden;
+}
+
+html.dark .react-flow__controls {
+  border-color: #292524 !important;
+  background: #0c0a09 !important;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border-bottom: 1px solid #e7e0d8 !important;
+  color: #78716c !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+html.dark .react-flow__controls-button {
+  border-bottom-color: #292524 !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #f6821f18 !important;
+  color: #f6821f !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__minimap {
+  border: 1px solid #e7e0d8 !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  background: #f0ebe4 !important;
+}
+
+html.dark .react-flow__minimap {
+  border-color: #292524 !important;
+  background: #171412 !important;
 }
 
 .react-flow__node-modelNode {

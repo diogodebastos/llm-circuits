@@ -150,6 +150,23 @@ function useDarkMode() {
   return dark;
 }
 
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <h3 className="mb-2 flex items-center gap-1.5 text-[9px] font-normal uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+      <span className="inline-block h-px w-3 bg-stone-300 dark:bg-stone-700" />
+      {label}
+    </h3>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="animate-spin-cw h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Inner() {
   const initialCircuit = useMemo<Circuit>(() => {
     const fromHash = readHashCircuit();
@@ -170,7 +187,6 @@ function Inner() {
   const [shareMsg, setShareMsg] = useState<string>("");
   const isDark = useDarkMode();
 
-  // Fetch seed library once.
   useEffect(() => {
     fetch("/api/capacitors")
       .then((r) => r.json())
@@ -178,7 +194,6 @@ function Inner() {
       .catch(() => setSeeds([]));
   }, []);
 
-  // Stable callbacks — defined before injection effect.
   const onChangeModel = useCallback(
     (nodeId: string, newModel: string) => {
       setNodes((ns) => ns.map((n) => (n.id === nodeId ? { ...n, data: { ...(n.data as object), modelId: newModel } } : n)));
@@ -255,12 +270,10 @@ function Inner() {
     [seeds, onChangeModel, onChangeCapSeed, onChangeCapMode, onClearCap, onSaveCapText, onChangeInductorRuns]
   );
 
-  // Re-inject callbacks/seeds whenever the decorator identity changes.
   useEffect(() => {
     setNodes((ns) => ns.map(decorate));
   }, [decorate, setNodes]);
 
-  // Splice trace into nodes after a run.
   useEffect(() => {
     if (!response) return;
     const traceById = new Map(response.trace.map((t) => [t.nodeId, t]));
@@ -282,7 +295,6 @@ function Inner() {
     }
   }, [response, setNodes]);
 
-  // Persist circuit (debounced) on any node/edge change.
   const persistTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (persistTimer.current) window.clearTimeout(persistTimer.current);
@@ -320,10 +332,10 @@ function Inner() {
   const copyShareLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      setShareMsg("link copied ✓");
+      setShareMsg("copied ✓");
       setTimeout(() => setShareMsg(""), 1500);
     } catch {
-      setShareMsg("copy failed");
+      setShareMsg("failed");
     }
   };
 
@@ -406,84 +418,112 @@ function Inner() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)_360px]">
-      <aside className="space-y-4 rounded-md border border-stone-200 bg-white p-4 text-sm shadow-sm dark:border-stone-800 dark:bg-stone-950">
-        <div>
-          <h3 className="mb-2 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Canvas</h3>
-          <button onClick={newCanvas} className="w-full rounded bg-stone-100 px-2 py-1 text-left text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700">
-            + New canvas
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)_340px]">
+      {/* Left sidebar */}
+      <aside className="space-y-0 rounded-md border border-stone-200 bg-white p-4 text-sm shadow-sm dark:border-stone-800 dark:bg-stone-950">
+        <div className="sidebar-section">
+          <SectionHeader label="Canvas" />
+          <button onClick={newCanvas} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+            <span className="mr-1.5 text-stone-300 dark:text-stone-700">+</span>New canvas
           </button>
-          <button onClick={copyShareLink} className="mt-1 w-full rounded bg-stone-100 px-2 py-1 text-left text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700">
-            🔗 Copy share link {shareMsg && <span className="text-emerald-600 dark:text-emerald-400">— {shareMsg}</span>}
+          <button onClick={copyShareLink} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+            <span className="mr-1.5 text-stone-300 dark:text-stone-700">⎘</span>Share link
+            {shareMsg && <span className="ml-1 text-[10px] text-emerald-500">{shareMsg}</span>}
           </button>
-          <button onClick={resetEverything} className="mt-1 w-full rounded bg-stone-100 px-2 py-1 text-left text-rose-500 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700">
-            ⟲ Reset (wipe save)
+          <button onClick={resetEverything} className="w-full rounded px-2 py-1.5 text-left text-xs text-rose-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-rose-600 dark:hover:bg-stone-900 dark:hover:text-rose-400">
+            <span className="mr-1.5">⟲</span>Reset
           </button>
         </div>
-        <div>
-          <h3 className="mb-2 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Presets</h3>
-          <div className="flex flex-col gap-1">
+
+        <div className="sidebar-section">
+          <SectionHeader label="Presets" />
+          <div className="flex flex-col gap-0.5">
             {Object.entries(PRESETS).map(([k, p]) => (
-              <button key={k} onClick={() => loadPreset(k as keyof typeof PRESETS)} className="rounded bg-stone-100 px-2 py-1 text-left text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700">
+              <button key={k} onClick={() => loadPreset(k as keyof typeof PRESETS)} className="group w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-orange-50 hover:text-[#f6821f] dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-[#f6821f]">
+                <span className="mr-1.5 text-stone-300 transition-colors group-hover:text-[#f6821f] dark:text-stone-700">→</span>
                 {p.label}
               </button>
             ))}
           </div>
         </div>
-        <div>
-          <h3 className="mb-2 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Add resistor</h3>
-          <div className="flex flex-col gap-1">
+
+        <div className="sidebar-section">
+          <SectionHeader label="Add resistor" />
+          <div className="flex flex-col gap-0.5">
             {MODELS.map((m) => (
               <button
                 key={m.id}
                 onClick={() => addModelNode(m.id)}
-                className="rounded bg-stone-100 px-2 py-1 text-left text-xs text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700"
+                className="group w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-orange-50 dark:text-stone-400 dark:hover:bg-stone-900"
                 title={m.description}
               >
-                + {m.label} <span className="text-stone-400 dark:text-stone-500">{m.R}Ω</span>
+                <div className="flex items-center justify-between">
+                  <span>
+                    <span className="mr-1 opacity-50 transition-opacity group-hover:opacity-100" style={{ color: "#f6821f" }}>⊡</span>
+                    {m.label}
+                  </span>
+                  <span className="tabular-nums text-[10px] text-stone-400 transition-colors group-hover:text-[#f6821f] dark:text-stone-600">{m.R}Ω</span>
+                </div>
               </button>
             ))}
           </div>
         </div>
-        <div>
-          <h3 className="mb-2 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Add memory</h3>
-          <div className="flex flex-col gap-1">
+
+        <div className="sidebar-section">
+          <SectionHeader label="Add memory" />
+          <div className="flex flex-col gap-0.5">
             {seeds.map((s) => (
               <button
                 key={s.slug}
                 onClick={() => addCapacitor(s.slug)}
-                className="rounded bg-stone-100 px-2 py-1 text-left text-xs text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700"
+                className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-sky-50 hover:text-sky-700 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-sky-400"
               >
-                + ⊓ {s.title}
+                <span className="mr-1 text-sky-400 opacity-60">⊓</span>{s.title}
               </button>
             ))}
-            <button onClick={addInductor} className="rounded bg-stone-100 px-2 py-1 text-left text-xs text-stone-700 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700">
-              + ∿ Inductor
+            <button onClick={addInductor} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-violet-50 hover:text-violet-700 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-violet-400">
+              <span className="mr-1 text-violet-400 opacity-60">∿</span>Inductor
             </button>
           </div>
         </div>
-        <div>
-          <h3 className="mb-2 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Mode</h3>
-          <div className="flex flex-col gap-1">
+
+        <div className="sidebar-section">
+          <SectionHeader label="Mode" />
+          <div role="radiogroup" aria-label="Execution mode" className="flex flex-col gap-1">
             {MODES.map((m) => (
-              <label
+              <button
                 key={m.id}
-                className={`cursor-pointer rounded border px-2 py-1 text-xs ${
+                role="radio"
+                aria-checked={mode === m.id}
+                onClick={() => setMode(m.id)}
+                className={`w-full rounded border px-2 py-2 text-left transition-colors ${
                   mode === m.id
-                    ? "border-[#f6821f] bg-orange-50 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
-                    : "border-stone-200 text-stone-700 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
+                    ? "border-[#f6821f] bg-[#f6821f0c] dark:bg-[#f6821f0a]"
+                    : "border-transparent hover:border-stone-200 hover:bg-stone-50 dark:hover:border-stone-800 dark:hover:bg-stone-900"
                 }`}
               >
-                <input type="radio" name="mode" className="mr-1" checked={mode === m.id} onChange={() => setMode(m.id)} />
-                <span className="font-bold">{m.label}</span>
-                <div className="text-[10px] text-stone-400 dark:text-stone-500">{m.blurb}</div>
-              </label>
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full transition-colors ${mode === m.id ? "bg-[#f6821f]" : "bg-stone-300 dark:bg-stone-700"}`} />
+                  <span className={`text-xs font-bold ${mode === m.id ? "text-stone-900 dark:text-stone-100" : "text-stone-600 dark:text-stone-400"}`}>
+                    {m.label}
+                  </span>
+                </div>
+                <div className="mt-0.5 pl-3 text-[10px] leading-snug text-stone-400 dark:text-stone-600">{m.blurb}</div>
+              </button>
             ))}
           </div>
         </div>
       </aside>
 
-      <div className="h-[640px] overflow-hidden rounded-md border border-stone-200 bg-[#faf9f6] shadow-sm dark:border-stone-800 dark:bg-stone-950">
+      {/* Canvas */}
+      <div className="relative min-h-[520px] h-[calc(100vh-220px)] max-h-[900px] overflow-hidden rounded-md border border-stone-200 bg-[#faf9f6] shadow-sm dark:border-stone-800 dark:bg-stone-950">
+        {nodes.length === 0 && (
+          <div className="canvas-empty-hint">
+            <div className="canvas-empty-hint__symbol">⊡—⊡</div>
+            <div className="text-[11px] opacity-40">Canvas is clear</div>
+            <div className="text-[10px] opacity-25">Load a preset from the left, or drag in components</div>
+          </div>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -502,47 +542,103 @@ function Inner() {
         </ReactFlow>
       </div>
 
+      {/* Right output panel */}
       <aside className="space-y-3 rounded-md border border-stone-200 bg-white p-4 text-sm shadow-sm dark:border-stone-800 dark:bg-stone-950">
-        <h3 className="text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Prompt (Voltage)</h3>
-        <textarea
-          className="h-32 w-full rounded border border-stone-200 bg-stone-50 p-2 text-xs text-stone-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
+        <div>
+          <label className="mb-1.5 flex items-center gap-2">
+            <span className="text-[9px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+              <span className="mr-1 inline-block h-px w-3 bg-stone-300 dark:bg-stone-700" />
+              Voltage (Prompt)
+            </span>
+            <span className="ml-auto tabular-nums text-[10px] text-stone-300 dark:text-stone-700">{prompt.length} ch</span>
+          </label>
+          <textarea
+            className="h-36 w-full resize-none rounded border border-stone-200 bg-stone-50 p-2.5 text-xs leading-relaxed text-stone-800 placeholder-stone-300 transition-colors focus:border-[#f6821f] focus:outline-none focus:ring-1 focus:ring-[#f6821f] dark:border-stone-800 dark:bg-stone-900 dark:text-stone-100 dark:placeholder-stone-700 dark:focus:border-[#f6821f]"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Enter your prompt…"
+          />
+        </div>
+
         <button
           onClick={onRun}
           disabled={running}
-          className="w-full rounded bg-[#f6821f] px-3 py-2 font-bold text-white hover:bg-[#e5741a] disabled:opacity-50"
+          className={`relative w-full rounded px-3 py-2.5 font-bold tracking-wide text-white transition-all ${
+            running ? "cursor-not-allowed bg-[#e5741a]" : "bg-[#f6821f] hover:bg-[#e5741a] active:scale-[0.98]"
+          }`}
+          style={{ fontFamily: "'Chakra Petch', monospace" }}
         >
-          {running ? "Running…" : "⚡ Apply Current"}
+          <span className={`absolute inset-0 rounded ${running ? "animate-scan" : ""}`} />
+          <span className="relative flex items-center justify-center gap-2">
+            {running ? (
+              <>
+                <Spinner />
+                Running…
+              </>
+            ) : (
+              <>⚡ Apply Current</>
+            )}
+          </span>
         </button>
-        {response?.error && <div className="rounded bg-rose-50 p-2 text-xs text-rose-600 dark:bg-rose-950 dark:text-rose-300">{response.error}</div>}
+
+        {response?.error && (
+          <div className="rounded bg-rose-50 p-2 text-xs text-rose-600 dark:bg-rose-950 dark:text-rose-300">{response.error}</div>
+        )}
+
         {response?.rTotal != null && (
-          <div className="rounded bg-stone-100 p-2 text-xs text-stone-700 dark:bg-stone-800 dark:text-stone-300">
-            R<sub>total</sub> = {response.rTotal.toFixed(2)}Ω
+          <div className="stat-callout">
+            <span className="stat-callout__label">Circuit Impedance</span>
+            <div className="flex items-baseline gap-1">
+              <span className="stat-callout__value">{response.rTotal.toFixed(1)}</span>
+              <span className="stat-callout__unit">Ω</span>
+            </div>
           </div>
         )}
+
         {response?.finalOutput && (
           <div>
-            <h4 className="mb-1 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Final output</h4>
-            <div className="max-h-72 overflow-y-auto rounded border border-stone-200 bg-stone-50 p-2 text-xs text-stone-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
+            <h4 className="mb-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+              <span className="inline-block h-px w-3 bg-emerald-400" />
+              Final Output
+            </h4>
+            <div className="max-h-80 overflow-y-auto rounded border border-stone-200 bg-stone-50 p-3 text-xs leading-relaxed text-stone-800 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-100">
               <FormattedOutput text={response.finalOutput} />
             </div>
           </div>
         )}
+
         {response?.trace && response.trace.length > 0 && (
           <div>
-            <h4 className="mb-1 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Per-node trace</h4>
+            <h4 className="mb-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+              <span className="inline-block h-px w-3 bg-stone-300 dark:bg-stone-700" />
+              Per-node trace
+            </h4>
             <div className="space-y-1">
               {response.trace.map((t) => (
-                <details key={t.nodeId} className="rounded border border-stone-200 bg-stone-50 p-2 text-[11px] dark:border-stone-700 dark:bg-stone-900">
-                  <summary className="cursor-pointer">
-                    <span className="font-bold text-stone-800 dark:text-stone-100">{t.modelId ? t.modelId.split("/").pop() : t.kind}</span>
-                    <span className="ml-2 text-stone-400 dark:text-stone-500">{t.status}</span>
-                    {t.maxTokens != null && <span className="ml-2 text-stone-400 dark:text-stone-500">max={t.maxTokens}</span>}
+                <details key={t.nodeId} className="group overflow-hidden rounded border border-stone-200 bg-stone-50 text-[11px] dark:border-stone-800 dark:bg-stone-900">
+                  <summary className="flex cursor-pointer select-none list-none items-center gap-2 px-2.5 py-2 transition-colors hover:bg-stone-100 dark:hover:bg-stone-800">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                      t.status === "done" ? "bg-emerald-400" :
+                      t.status === "error" ? "bg-rose-400" :
+                      t.status === "running" ? "bg-[#f6821f] animate-pulse" :
+                      "bg-stone-300 dark:bg-stone-700"
+                    }`} />
+                    <span className="flex-1 truncate font-bold text-stone-800 dark:text-stone-100">
+                      {t.modelId ? t.modelId.split("/").pop() : t.kind}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[10px] text-stone-400 dark:text-stone-600">
+                      {t.status}{t.maxTokens != null && ` · ${t.maxTokens}tk`}
+                    </span>
+                    <svg className="h-3 w-3 shrink-0 text-stone-400 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </summary>
-                  {t.output && <div className="mt-1 whitespace-pre-wrap text-stone-700 dark:text-stone-300">{t.output}</div>}
-                  {t.error && <div className="mt-1 text-rose-500 dark:text-rose-400">{t.error}</div>}
+                  {(t.output || t.error) && (
+                    <div className="border-t border-stone-200 px-2.5 py-2 dark:border-stone-800">
+                      {t.output && <div className="whitespace-pre-wrap leading-relaxed text-stone-700 dark:text-stone-300">{t.output}</div>}
+                      {t.error && <div className="text-rose-500 dark:text-rose-400">{t.error}</div>}
+                    </div>
+                  )}
                 </details>
               ))}
             </div>
