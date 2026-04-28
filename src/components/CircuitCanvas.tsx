@@ -21,6 +21,7 @@ import { MODELS } from "@/lib/models";
 import type { CapacitorMode, Circuit, CircuitMode, CircuitNode } from "@/lib/graph";
 import type { NodeTrace, RunResponse } from "@/lib/runner";
 import { runCircuit } from "@/lib/runner";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
   encodeCircuit,
   loadAutosave,
@@ -123,6 +124,16 @@ function circuitToFlow(c: Circuit): { nodes: Node[]; edges: Edge[] } {
   };
 }
 
+function rotateForMobile(c: Circuit): Circuit {
+  return {
+    ...c,
+    nodes: c.nodes.map((n) => ({
+      ...n,
+      position: n.position ? { x: n.position.y, y: n.position.x } : { x: 0, y: 0 },
+    })),
+  };
+}
+
 function flowToCircuit(nodes: Node[], edges: Edge[]): Circuit {
   return {
     nodes: nodes.map((n) => {
@@ -168,12 +179,14 @@ function Spinner() {
 }
 
 function Inner() {
+  const isMobile = useIsMobile();
   const initialCircuit = useMemo<Circuit>(() => {
     const fromHash = readHashCircuit();
     if (fromHash && fromHash.nodes.length > 0) return fromHash;
     const fromLS = loadAutosave();
     if (fromLS && fromLS.nodes.length > 0) return fromLS;
-    return PRESETS.series2!.circuit;
+    return isMobile ? rotateForMobile(PRESETS.series2!.circuit) : PRESETS.series2!.circuit;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const initial = useMemo(() => circuitToFlow(initialCircuit), [initialCircuit]);
@@ -313,7 +326,8 @@ function Inner() {
   );
 
   const loadPreset = (key: keyof typeof PRESETS) => {
-    const f = circuitToFlow(PRESETS[key]!.circuit);
+    const c = isMobile ? rotateForMobile(PRESETS[key]!.circuit) : PRESETS[key]!.circuit;
+    const f = circuitToFlow(c);
     setNodes(f.nodes.map(decorate));
     setEdges(f.edges);
   };
@@ -538,7 +552,7 @@ function Inner() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           fitView
-          minZoom={0.5}
+          minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
