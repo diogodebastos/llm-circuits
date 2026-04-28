@@ -55,6 +55,33 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
       edges: [{ id: "cap-m", source: "cap", target: "m" }],
     },
   },
+  buildWebsite: {
+    label: "Build a website (full stack)",
+    // Style-guide capacitor seeds the planner. Planner fans out to parallel
+    // HTML and CSS specialists, a merge model fuses them, and an inductor
+    // votes across 3 runs of the final renderer to stabilize the HTML output.
+    // Prompt with something like: "a landing page for a tea shop".
+    circuit: {
+      nodes: [
+        { kind: "capacitor", id: "cap", seedSlug: "style-guide", mode: "inject", position: { x: 40, y: 200 } },
+        { kind: "model", id: "plan", modelId: "@cf/qwen/qwq-32b", position: { x: 240, y: 200 } },
+        { kind: "model", id: "html", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 460, y: 80 } },
+        { kind: "model", id: "css", modelId: "@cf/google/gemma-3-12b-it", position: { x: 460, y: 320 } },
+        { kind: "model", id: "merge", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 700, y: 200 } },
+        { kind: "inductor", id: "ind", runs: 3, position: { x: 920, y: 200 } },
+        { kind: "model", id: "render", modelId: "@cf/qwen/qwq-32b", position: { x: 1100, y: 200 } },
+      ],
+      edges: [
+        { id: "cap-plan", source: "cap", target: "plan" },
+        { id: "plan-html", source: "plan", target: "html" },
+        { id: "plan-css", source: "plan", target: "css" },
+        { id: "html-merge", source: "html", target: "merge" },
+        { id: "css-merge", source: "css", target: "merge" },
+        { id: "merge-ind", source: "merge", target: "ind" },
+        { id: "ind-render", source: "ind", target: "render" },
+      ],
+    },
+  },
   inductorStable: {
     label: "Inductor — stabilize a small LLM",
     // Inductor x3 in front of a small model. On an ambiguous prompt the bare

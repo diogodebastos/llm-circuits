@@ -17,9 +17,9 @@ export interface CapacitorNodeData {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "border-slate-700",
-  running: "border-amber-400",
-  done: "border-sky-400",
+  pending: "border-stone-200 dark:border-stone-700",
+  running: "border-[#f6821f]",
+  done: "border-sky-500",
   error: "border-rose-500",
 };
 
@@ -31,18 +31,18 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
     if (!editing) setDraft(data.storedText ?? "");
   }, [data.storedText, editing]);
   return (
-    <div className={`min-w-[210px] rounded-md border-2 ${STATUS_COLORS[status]} bg-slate-900 p-3 text-sm`}>
+    <div className={`min-w-[210px] rounded-md border-2 ${STATUS_COLORS[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100`}>
       <Handle
         type="target"
         position={Position.Left}
-        style={{ width: 14, height: 14, background: "#7dd3fc", border: "2px solid #0f172a" }}
+        style={{ width: 14, height: 14, background: "#0ea5e9", border: "2px solid #fff" }}
       />
       <div className="flex items-center justify-between gap-2">
         <span className="font-bold">⊓ Capacitor</span>
-        <span className="text-xs text-slate-400">{data.storedChars ?? 0} ch</span>
+        <span className="text-xs text-stone-400 dark:text-stone-500">{data.storedChars ?? 0} ch</span>
       </div>
       <select
-        className="nodrag nowheel mt-2 w-full rounded bg-slate-800 px-1 py-0.5 text-xs"
+        className="nodrag nowheel mt-2 w-full rounded bg-stone-100 px-1 py-0.5 text-xs text-stone-700 dark:bg-stone-800 dark:text-stone-200"
         value={data.seedSlug}
         onChange={(e) => data.onChangeSeed?.(e.target.value)}
         onPointerDown={(e) => e.stopPropagation()}
@@ -55,7 +55,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
         ))}
       </select>
       <select
-        className="nodrag nowheel mt-1 w-full rounded bg-slate-800 px-1 py-0.5 text-[11px]"
+        className="nodrag nowheel mt-1 w-full rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-700 dark:bg-stone-800 dark:text-stone-200"
         value={data.mode}
         onChange={(e) => data.onChangeMode?.(e.target.value as CapacitorMode)}
         onPointerDown={(e) => e.stopPropagation()}
@@ -67,7 +67,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
       </select>
       <div className="mt-1 flex gap-1">
         <button
-          className="nodrag flex-1 rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-400 hover:bg-slate-700"
+          className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
           onClick={(e) => {
             e.stopPropagation();
             setEditing((v) => !v);
@@ -76,7 +76,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
           {editing ? "cancel" : "✎ edit"}
         </button>
         <button
-          className="nodrag flex-1 rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-400 hover:bg-slate-700"
+          className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
           onClick={(e) => {
             e.stopPropagation();
             data.onClear?.();
@@ -93,11 +93,11 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
             onChange={(e) => setDraft(e.target.value)}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="h-24 w-full rounded bg-slate-950 p-1 text-[11px] text-slate-100"
+            className="h-24 w-full rounded border border-stone-200 bg-stone-50 p-1 text-[11px] text-stone-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
             placeholder="(empty — will fall back to seed at run time)"
           />
           <button
-            className="mt-1 w-full rounded bg-emerald-500 px-1 py-0.5 text-[11px] font-bold text-slate-900 hover:bg-emerald-400"
+            className="mt-1 w-full rounded bg-emerald-500 px-1 py-0.5 text-[11px] font-bold text-white hover:bg-emerald-600"
             onClick={(e) => {
               e.stopPropagation();
               data.onSaveText?.(draft);
@@ -111,7 +111,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
       <Handle
         type="source"
         position={Position.Right}
-        style={{ width: 14, height: 14, background: "#7dd3fc", border: "2px solid #0f172a" }}
+        style={{ width: 14, height: 14, background: "#0ea5e9", border: "2px solid #fff" }}
       />
     </div>
   );

@@ -13,9 +13,9 @@ const { post } = Astro.props;
 const { Content } = await render(post);
 ---
 <Base title={post.data.title}>
-  <article class="prose prose-invert max-w-none">
+  <article class="prose max-w-none dark:prose-invert">
     <h1>{post.data.title}</h1>
-    {post.data.description && <p class="text-slate-400">{post.data.description}</p>}
+    {post.data.description && <p class="text-stone-500 dark:text-stone-400">{post.data.description}</p>}
     <Content />
   </article>
 </Base>
