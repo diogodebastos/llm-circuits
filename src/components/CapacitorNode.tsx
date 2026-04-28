@@ -45,7 +45,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
     if (!editing) setDraft(data.storedText ?? "");
   }, [data.storedText, editing]);
   return (
-    <div className={`min-w-[210px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
+    <div className={`w-[240px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
       <Handle
         type="target"
         position={Position.Left}
