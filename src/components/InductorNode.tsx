@@ -1,5 +1,6 @@
 import { Handle, Position } from "@xyflow/react";
 import type { NodeTrace } from "@/lib/runner";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 export interface InductorNodeData {
   runs: number;
@@ -30,11 +31,14 @@ const STATUS_DOT: Record<string, string> = {
 
 export default function InductorNode({ data }: { data: InductorNodeData }) {
   const status = data.trace?.status ?? "pending";
+  const isMobile = useIsMobile();
+  const targetPos = isMobile ? Position.Top : Position.Left;
+  const sourcePos = isMobile ? Position.Bottom : Position.Right;
   return (
     <div className={`min-w-[180px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
       <Handle
         type="target"
-        position={Position.Left}
+        position={targetPos}
         style={{ width: 12, height: 12, background: "#c4b5fd", border: "2px solid #fff" }}
       />
 
@@ -72,7 +76,7 @@ export default function InductorNode({ data }: { data: InductorNodeData }) {
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={sourcePos}
         style={{ width: 12, height: 12, background: "#c4b5fd", border: "2px solid #fff" }}
       />
     </div>

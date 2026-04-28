@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { CapacitorMode } from "@/lib/graph";
 import type { NodeTrace } from "@/lib/runner";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 export interface CapacitorNodeData {
   seedSlug: string;
@@ -39,6 +40,9 @@ const STATUS_DOT: Record<string, string> = {
 
 export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
   const status = data.trace?.status ?? "pending";
+  const isMobile = useIsMobile();
+  const targetPos = isMobile ? Position.Top : Position.Left;
+  const sourcePos = isMobile ? Position.Bottom : Position.Right;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data.storedText ?? "");
   useEffect(() => {
@@ -48,7 +52,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
     <div className={`w-[240px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
       <Handle
         type="target"
-        position={Position.Left}
+        position={targetPos}
         style={{ width: 12, height: 12, background: "#0ea5e9", border: "2px solid #fff" }}
       />
 
@@ -143,7 +147,7 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={sourcePos}
         style={{ width: 12, height: 12, background: "#0ea5e9", border: "2px solid #fff" }}
       />
     </div>

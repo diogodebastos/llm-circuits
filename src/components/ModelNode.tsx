@@ -1,6 +1,7 @@
 import { Handle, Position } from "@xyflow/react";
 import { MODELS } from "@/lib/models";
 import type { NodeTrace } from "@/lib/runner";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 export interface ModelNodeData {
   modelId: string;
@@ -32,11 +33,14 @@ const STATUS_DOT: Record<string, string> = {
 export default function ModelNode({ data }: { data: ModelNodeData }) {
   const status = data.trace?.status ?? "pending";
   const model = MODELS.find((m) => m.id === data.modelId);
+  const isMobile = useIsMobile();
+  const targetPos = isMobile ? Position.Top : Position.Left;
+  const sourcePos = isMobile ? Position.Bottom : Position.Right;
   return (
     <div className={`min-w-[210px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
       <Handle
         type="target"
-        position={Position.Left}
+        position={targetPos}
         style={{ width: 12, height: 12, background: "#f6821f", border: "2px solid #fff" }}
       />
 
@@ -87,7 +91,7 @@ export default function ModelNode({ data }: { data: ModelNodeData }) {
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={sourcePos}
         style={{ width: 12, height: 12, background: "#f6821f", border: "2px solid #fff" }}
       />
     </div>
