@@ -37,6 +37,57 @@ import {
 
 const nodeTypes = { modelNode: ModelNode, capacitorNode: CapacitorNode, inductorNode: InductorNode };
 
+function CodeBlock({ lang, content }: { lang: string; content: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div className="rounded border border-stone-700 bg-stone-900 dark:border-stone-600 dark:bg-stone-950">
+      <div className="flex items-center justify-between border-b border-stone-700 px-3 py-1 dark:border-stone-600">
+        <span className="text-[10px] text-stone-400">{lang || "code"}</span>
+        <button
+          onClick={copy}
+          className="text-[10px] text-stone-400 transition-colors hover:text-[#f6821f]"
+        >
+          {copied ? "✓ copied" : "copy"}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-3 text-[11px] leading-relaxed text-stone-100">
+        <code>{content}</code>
+      </pre>
+    </div>
+  );
+}
+
+function FormattedOutput({ text }: { text: string }) {
+  const parts: Array<{ type: "text" | "code"; content: string; lang?: string }> = [];
+  const re = /```(\w*)\n?([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: "text", content: text.slice(last, m.index) });
+    parts.push({ type: "code", lang: m[1] || "", content: m[2] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", content: text.slice(last) });
+
+  if (parts.length === 0) return <span className="whitespace-pre-wrap">{text}</span>;
+  return (
+    <div className="space-y-2">
+      {parts.map((p, i) =>
+        p.type === "code" ? (
+          <CodeBlock key={i} lang={p.lang!} content={p.content} />
+        ) : p.content.trim() ? (
+          <div key={i} className="whitespace-pre-wrap">{p.content}</div>
+        ) : null
+      )}
+    </div>
+  );
+}
+
 const MODES: Array<{ id: CircuitMode; label: string; blurb: string }> = [
   { id: "refine-vote", label: "Refine / Vote", blurb: "Series refines prior answer. Parallel votes for consensus." },
   { id: "chain-ensemble", label: "Chain / Ensemble", blurb: "Series chains output. Parallel synthesizes via judge." },
@@ -474,8 +525,8 @@ function Inner() {
         {response?.finalOutput && (
           <div>
             <h4 className="mb-1 text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Final output</h4>
-            <div className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded border border-stone-200 bg-stone-50 p-2 text-xs text-stone-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
-              {response.finalOutput}
+            <div className="max-h-72 overflow-y-auto rounded border border-stone-200 bg-stone-50 p-2 text-xs text-stone-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
+              <FormattedOutput text={response.finalOutput} />
             </div>
           </div>
         )}
