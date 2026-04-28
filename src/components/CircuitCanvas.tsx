@@ -448,7 +448,7 @@ function Inner() {
         </div>
 
         <div className="sidebar-section">
-          <SectionHeader label="Add resistor" />
+          <SectionHeader label="Resistance / LLM" />
           <div className="flex flex-col gap-0.5">
             {MODELS.map((m) => (
               <button
@@ -470,7 +470,7 @@ function Inner() {
         </div>
 
         <div className="sidebar-section">
-          <SectionHeader label="Add memory" />
+          <SectionHeader label="Capacitance / Memory" />
           <div className="flex flex-col gap-0.5">
             {seeds.map((s) => (
               <button
@@ -481,6 +481,12 @@ function Inner() {
                 <span className="mr-1 text-sky-400 opacity-60">⊓</span>{s.title}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="sidebar-section">
+          <SectionHeader label="Inductance / Stability" />
+          <div className="flex flex-col gap-0.5">
             <button onClick={addInductor} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-violet-50 hover:text-violet-700 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-violet-400">
               <span className="mr-1 text-violet-400 opacity-60">∿</span>Inductor
             </button>
