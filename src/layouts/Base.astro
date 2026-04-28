@@ -23,17 +23,24 @@ const { title = "LLM Circuits" } = Astro.props;
   </head>
   <body class="min-h-screen">
     <header class="border-b border-stone-200 bg-white/90 px-6 py-3 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-950/90">
-      <nav class="mx-auto flex max-w-6xl items-center justify-between text-sm">
-        <a href="/" class="font-bold tracking-wide" style="font-family: 'Chakra Petch', monospace;">
-          <span style="color: #f6821f;">⚡</span> LLM Circuits
+      <nav class="mx-auto flex w-full max-w-[1400px] items-center justify-between text-sm">
+        <a href="/" class="group flex items-baseline gap-3" style="font-family: 'Chakra Petch', monospace;">
+          <span class="text-base font-bold tracking-wide text-stone-900 transition-colors group-hover:text-[#f6821f] dark:text-stone-100">
+            <span style="color: #f6821f;">⚡</span> LLM Circuits
+          </span>
+          <span class="hidden border-l border-stone-300 pl-3 text-[10px] tracking-[0.18em] uppercase text-stone-400 dark:border-stone-700 dark:text-stone-600 sm:inline">
+            v0.1 · Playground
+          </span>
         </a>
-        <div class="flex items-center gap-4 text-stone-500 dark:text-stone-400">
-          <a href="/" class="transition-colors hover:text-[#f6821f]">Playground</a>
-          <a href="/blog/blogpost" class="transition-colors hover:text-[#f6821f]">Blog</a>
+        <div class="flex items-center gap-1 text-stone-500 dark:text-stone-400">
+          <a href="/" class="rounded px-2 py-1 text-xs tracking-wide transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:hover:bg-stone-900">Playground</a>
+          <span class="select-none text-xs text-stone-300 dark:text-stone-700">/</span>
+          <a href="/blog/blogpost" class="rounded px-2 py-1 text-xs tracking-wide transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:hover:bg-stone-900">Blog</a>
+          <span class="mx-1 select-none text-stone-300 dark:text-stone-700">|</span>
           <button
             id="theme-toggle"
             aria-label="Toggle dark mode"
-            class="rounded p-1.5 text-stone-400 transition-colors hover:text-[#f6821f] dark:text-stone-500"
+            class="rounded p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:text-stone-500 dark:hover:bg-stone-900"
           >
             <!-- sun: shown in dark mode -->
             <svg class="hidden dark:block" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -55,11 +62,20 @@ const { title = "LLM Circuits" } = Astro.props;
         </div>
       </nav>
     </header>
-    <main class="mx-auto max-w-6xl px-6 py-6">
+    <main class="mx-auto w-full max-w-[1400px] px-6 py-6">
       <slot />
     </main>
-    <footer class="mx-auto max-w-6xl px-6 py-8 text-xs text-stone-400 dark:text-stone-600">
-      Built on Cloudflare Workers AI · models run server-side via the AI binding.
+    <footer class="mx-auto w-full max-w-[1400px] border-t border-stone-200 px-6 py-5 dark:border-stone-900">
+      <div class="flex items-start justify-between gap-4 text-[10px] tracking-wide text-stone-400 dark:text-stone-600">
+        <div class="flex flex-col gap-1">
+          <span style="font-family: 'Chakra Petch', monospace;" class="text-xs font-bold text-stone-500 dark:text-stone-500">LLM Circuits</span>
+          <span>Voltage = prompt · Resistor = LLM · Capacitor = memory · Inductor = vote stabilizer</span>
+        </div>
+        <div class="shrink-0 text-right">
+          <span>Cloudflare Workers AI</span><br/>
+          <span class="text-stone-300 dark:text-stone-700">server-side inference · no data stored</span>
+        </div>
+      </div>
     </footer>
     <script is:inline>
       document.getElementById('theme-toggle').addEventListener('click', function() {
