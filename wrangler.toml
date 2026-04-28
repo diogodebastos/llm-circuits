@@ -1,0 +1,15 @@
+name = "llm-circuits"
+main = "./dist/_worker.js/index.js"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+remote = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[observability]
+enabled = true

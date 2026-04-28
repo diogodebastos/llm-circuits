@@ -1,0 +1,29 @@
+---
+import "../styles/global.css";
+const { title = "LLM Circuits" } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen">
+    <header class="border-b border-slate-800 px-6 py-3">
+      <nav class="mx-auto flex max-w-6xl items-center justify-between text-sm">
+        <a href="/" class="font-bold tracking-wide">⚡ LLM Circuits</a>
+        <div class="flex gap-4 text-slate-400">
+          <a href="/" class="hover:text-slate-100">Playground</a>
+          <a href="/blog/blogpost" class="hover:text-slate-100">Blog</a>
+        </div>
+      </nav>
+    </header>
+    <main class="mx-auto max-w-6xl px-6 py-6">
+      <slot />
+    </main>
+    <footer class="mx-auto max-w-6xl px-6 py-8 text-xs text-slate-500">
+      Built on Cloudflare Workers AI · models run server-side via the AI binding.
+    </footer>
+  </body>
+</html>

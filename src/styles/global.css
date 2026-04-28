@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+@theme {
+  --color-wire: #7dd3fc;
+  --color-node: #0f172a;
+  --color-spark: #fbbf24;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html, body {
+  background-color: #020617;
+  color: #f1f5f9;
+  font-family: var(--font-mono);
+}
+
+.react-flow__node-modelNode {
+  border-radius: 0.375rem;
+  border: 1px solid #334155;
+  background-color: #0f172a;
+  color: #f1f5f9;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4);
+}
