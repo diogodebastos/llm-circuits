@@ -37,7 +37,7 @@ export default function ModelNode({ data }: { data: ModelNodeData }) {
   const targetPos = isMobile ? Position.Top : Position.Left;
   const sourcePos = isMobile ? Position.Bottom : Position.Right;
   return (
-    <div className={`min-w-[210px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
+    <div className={`w-[210px] rounded border-2 ${STATUS_COLORS[status]} ${STATUS_RING[status]} bg-white p-3 text-sm text-stone-800 dark:bg-stone-900 dark:text-stone-100 transition-shadow`}>
       <Handle
         type="target"
         position={targetPos}
@@ -84,7 +84,7 @@ export default function ModelNode({ data }: { data: ModelNodeData }) {
         </div>
       )}
       {data.trace?.error && (
-        <div className="mt-2 truncate text-[10px] text-rose-500 dark:text-rose-400" title={data.trace.error}>
+        <div className="mt-2 break-words text-[10px] text-rose-500 dark:text-rose-400">
           ✕ {data.trace.error}
         </div>
       )}

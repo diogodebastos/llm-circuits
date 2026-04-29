@@ -4,9 +4,7 @@ export interface RunRequest {
   circuit: Circuit;
   mode: CircuitMode;
   prompt: string;
-  /** Current capacitor states from client (nodeId -> stored text). */
   capStates?: Record<string, string>;
-  /** Seed bodies (slug -> body) so the worker can fall back when LS is empty. */
   seeds?: Record<string, string>;
 }
 
@@ -27,12 +25,14 @@ export interface RunResponse {
   finalOutput?: string;
   rTotal?: number;
   trace: NodeTrace[];
-  /** Updated capacitor states after the run (only those that changed). */
   capStates?: Record<string, string>;
   error?: string;
 }
 
-export async function runCircuit(req: RunRequest): Promise<RunResponse> {
+export async function runCircuit(
+  req: RunRequest,
+  onNodeUpdate?: (trace: NodeTrace) => void
+): Promise<RunResponse> {
   const res = await fetch("/api/run", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -41,5 +41,31 @@ export async function runCircuit(req: RunRequest): Promise<RunResponse> {
   if (!res.ok) {
     return { ok: false, trace: [], error: `HTTP ${res.status}: ${await res.text()}` };
   }
-  return (await res.json()) as RunResponse;
+
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop()!;
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const evt = JSON.parse(line.slice(6)) as { type: string; trace?: NodeTrace; result?: RunResponse };
+        if (evt.type === "node" && evt.trace && onNodeUpdate) {
+          onNodeUpdate(evt.trace);
+        } else if (evt.type === "done" && evt.result) {
+          return evt.result;
+        }
+      } catch {
+        // malformed SSE line — skip
+      }
+    }
+  }
+
+  return { ok: false, trace: [], error: "Stream ended without result" };
 }

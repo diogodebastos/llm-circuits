@@ -421,12 +421,28 @@ function Inner() {
   const onRun = async () => {
     setRunning(true);
     setResponse(null);
+    setNodes((ns) =>
+      ns.map((n) => ({
+        ...n,
+        data: {
+          ...(n.data as object),
+          trace: { nodeId: n.id, kind: (n.data as any).kind, status: "pending" as const },
+        },
+      }))
+    );
     const circuit = flowToCircuit(nodes, edges);
     const capIds = circuit.nodes.filter((n) => n.kind === "capacitor").map((n) => n.id);
     const capStates = loadAllCapStates(capIds);
     const seedMap: Record<string, string> = {};
     for (const s of seeds) seedMap[s.slug] = s.body;
-    const res = await runCircuit({ circuit, mode, prompt, capStates, seeds: seedMap });
+    const res = await runCircuit(
+      { circuit, mode, prompt, capStates, seeds: seedMap },
+      (trace) => {
+        setNodes((ns) =>
+          ns.map((n) => (n.id === trace.nodeId ? { ...n, data: { ...(n.data as object), trace } } : n))
+        );
+      }
+    );
     setResponse(res);
     setRunning(false);
   };

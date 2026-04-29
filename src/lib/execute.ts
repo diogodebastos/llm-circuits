@@ -66,7 +66,8 @@ export async function executeCircuit(
   mode: CircuitMode,
   userPrompt: string,
   capStatesIn: Record<string, string> = {},
-  seeds: Record<string, string> = {}
+  seeds: Record<string, string> = {},
+  onUpdate?: (trace: NodeTrace) => void
 ): Promise<RunResponse> {
   const v = validate(circuit);
   if (!v.ok) return { ok: false, trace: [], error: v.reason };
@@ -124,9 +125,8 @@ export async function executeCircuit(
         }
         trace.status = "done";
         trace.prompt = `mode=${node.mode} · before:\n${text || "(empty)"}`;
-        // For inject-only, output equals the value injected. For absorbers
-        // it'll be overwritten with the absorbed text after the next stage.
         trace.output = text || "(empty)";
+        onUpdate?.(trace);
         continue;
       }
 
@@ -134,12 +134,14 @@ export async function executeCircuit(
         pendingInductor = { nodeId: node.id, runs: Math.max(1, Math.min(7, node.runs | 0)) };
         trace.status = "done";
         trace.output = `(inductor: ${pendingInductor.runs} runs)`;
+        onUpdate?.(trace);
         continue;
       }
 
       // model node
       const spec = getModel(node.modelId);
       trace.status = "running";
+      onUpdate?.(trace);
       const promptIn = applyPendingInjects(
         mode === "refine-vote" && currentText !== userPrompt ? refinePrompt(currentText) : currentText
       );
@@ -161,6 +163,7 @@ export async function executeCircuit(
         }
         trace.output = out;
         trace.status = "done";
+        onUpdate?.(trace);
         if (mode === "physics") {
           rTotal += spec.R;
           trace.maxTokens = maxTokens;
@@ -177,6 +180,7 @@ export async function executeCircuit(
       } catch (err) {
         trace.status = "error";
         trace.error = err instanceof Error ? err.message : String(err);
+        onUpdate?.(trace);
         return { ok: false, trace: [...traceMap.values()], error: trace.error, capStates: capStatesOut };
       }
     } else {
@@ -210,14 +214,17 @@ export async function executeCircuit(
           trace.prompt = branchPrompt;
           trace.R = spec.R;
           trace.maxTokens = maxTokensList[i];
+          onUpdate?.(trace);
           try {
             const out = await callModel(ai, spec.id, branchPrompt, maxTokensList[i]);
             trace.output = out;
             trace.status = "done";
+            onUpdate?.(trace);
             return out;
           } catch (err) {
             trace.status = "error";
             trace.error = err instanceof Error ? err.message : String(err);
+            onUpdate?.(trace);
             return "";
           }
         })
