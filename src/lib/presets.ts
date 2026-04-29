@@ -90,6 +90,32 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
       ],
     },
   },
+  bestOfFour: {
+    label: "Best of four",
+    // Four diverse models answer the same prompt in parallel. A judge brief
+    // capacitor concatenates their answers and instructs a judge model to
+    // return the single best answer verbatim — no merging, no editing.
+    // Diverse priors + a strict pass-through judge = quality filter without
+    // averaging away the winner.
+    circuit: {
+      nodes: [
+        { kind: "model", id: "m1", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 2048, position: { x: 40, y: 0 } },
+        { kind: "model", id: "m2", modelId: "@cf/qwen/qwq-32b", maxTokens: 2048, position: { x: 40, y: 220 } },
+        { kind: "model", id: "m3", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", maxTokens: 2048, position: { x: 40, y: 440 } },
+        { kind: "model", id: "m4", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 2048, position: { x: 40, y: 660 } },
+
+        { kind: "capacitor", id: "cap-judge", seedSlug: "best-of-n-judge", mode: "inject", position: { x: 380, y: 330 } },
+        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 4096, position: { x: 720, y: 330 } },
+      ],
+      edges: [
+        { id: "m1-cap-judge", source: "m1", target: "cap-judge" },
+        { id: "m2-cap-judge", source: "m2", target: "cap-judge" },
+        { id: "m3-cap-judge", source: "m3", target: "cap-judge" },
+        { id: "m4-cap-judge", source: "m4", target: "cap-judge" },
+        { id: "cap-judge-judge", source: "cap-judge", target: "judge" },
+      ],
+    },
+  },
   buildWebsite: {
     label: "Build a website",
     // Brief capacitor (inject) seeds an inductor-stabilized planner: 3 plan
