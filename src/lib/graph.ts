@@ -10,6 +10,8 @@ interface NodeBase {
 export interface ModelCircuitNode extends NodeBase {
   kind: "model";
   modelId: string;
+  /** Optional per-node output cap. Falls back to mode default if unset. */
+  maxTokens?: number;
 }
 export interface CapacitorCircuitNode extends NodeBase {
   kind: "capacitor";
@@ -48,9 +50,14 @@ export interface ValidationOk {
    * Linear sequence of stages. A stage is either:
    *   - one node (series), or
    *   - parallel branch siblings sharing a fork node.
-   * Capacitors and inductors only appear as `single` stages.
+   * A parallel branch is a model node, optionally preceded by a single
+   * capacitor that injects/absorbs only into/out of that branch.
+   * Inductors only appear as `single` stages.
    */
-  stages: Array<{ kind: "single"; node: string } | { kind: "parallel"; nodes: string[] }>;
+  stages: Array<
+    | { kind: "single"; node: string }
+    | { kind: "parallel"; branches: Array<{ cap?: string; model: string }> }
+  >;
 }
 
 export type Validation = ValidationOk | ValidationError;
@@ -74,12 +81,17 @@ export function normalizeNode(raw: any): CircuitNode {
       position: raw.position,
     };
   }
-  return {
+  const node: ModelCircuitNode = {
     kind: "model",
     id: String(raw.id),
     modelId: String(raw.modelId),
     position: raw.position,
   };
+  if (raw?.maxTokens != null) {
+    const n = Number(raw.maxTokens);
+    if (Number.isFinite(n) && n > 0) node.maxTokens = n;
+  }
+  return node;
 }
 
 export function normalizeCircuit(raw: any): Circuit {
@@ -138,14 +150,57 @@ export function validate(c: Circuit): Validation {
   const { out, inn } = adjacency(c);
   const sources = c.nodes.filter((n) => (inn.get(n.id) ?? []).length === 0);
   const sinks = c.nodes.filter((n) => (out.get(n.id) ?? []).length === 0);
-  if (sources.length !== 1) return { ok: false, reason: "Need exactly one source node." };
+  if (sources.length === 0) return { ok: false, reason: "Need at least one source node." };
   if (sinks.length !== 1) return { ok: false, reason: "Need exactly one sink node." };
 
   const byId = new Map(c.nodes.map((n) => [n.id, n]));
   const stages: ValidationOk["stages"] = [];
-  let cursor = sources[0]!.id;
   const sinkId = sinks[0]!.id;
   const visited = new Set<string>();
+  let cursor: string;
+
+  if (sources.length === 1) {
+    cursor = sources[0]!.id;
+  } else {
+    // Multi-source: initial parallel stage. Each source is a parallel branch
+    // (either a model, or a capacitor → model). The user prompt is broadcast
+    // to every branch. All branches must converge on one join node.
+    const branches: Array<{ cap?: string; model: string }> = [];
+    const joins = new Set<string>();
+    for (const s of sources) {
+      const sOut = out.get(s.id) ?? [];
+      if (sOut.length !== 1) return { ok: false, reason: "Multi-source branch must have exactly one output." };
+      if (s.kind === "model") {
+        branches.push({ model: s.id });
+        joins.add(sOut[0]!);
+        visited.add(s.id);
+      } else if (s.kind === "capacitor") {
+        const next = sOut[0]!;
+        const nextNode = byId.get(next);
+        const nextIn = inn.get(next) ?? [];
+        const nextOut = out.get(next) ?? [];
+        if (!nextNode || nextNode.kind !== "model") {
+          return { ok: false, reason: "Source capacitor must feed a model." };
+        }
+        if (nextIn.length !== 1) return { ok: false, reason: "Branch model must have exactly one input." };
+        if (nextOut.length !== 1) return { ok: false, reason: "Branch model must have exactly one output." };
+        branches.push({ cap: s.id, model: next });
+        joins.add(nextOut[0]!);
+        visited.add(s.id);
+        visited.add(next);
+      } else {
+        return { ok: false, reason: "Source must be a model or capacitor." };
+      }
+    }
+    if (joins.size !== 1) return { ok: false, reason: "Source branches must converge on a single join node." };
+    const join = [...joins][0]!;
+    const joinIn = inn.get(join) ?? [];
+    if (joinIn.length !== branches.length) {
+      return { ok: false, reason: "Join node has unexpected incoming edges." };
+    }
+    stages.push({ kind: "parallel", branches });
+    cursor = join;
+  }
 
   while (true) {
     if (visited.has(cursor)) return { ok: false, reason: "Unsupported topology (revisit)." };
@@ -169,6 +224,7 @@ export function validate(c: Circuit): Validation {
 
     stages.push({ kind: "single", node: cursor });
     const branchNodes = successors;
+    const branches: Array<{ cap?: string; model: string }> = [];
     const joins = new Set<string>();
     for (const b of branchNodes) {
       const bOut = out.get(b) ?? [];
@@ -176,14 +232,34 @@ export function validate(c: Circuit): Validation {
       if (bIn.length !== 1) return { ok: false, reason: "Parallel branch has extra inputs." };
       if (bOut.length !== 1) return { ok: false, reason: "Parallel branch must have exactly one output." };
       const bn = byId.get(b);
-      if (bn && bn.kind !== "model") return { ok: false, reason: "Parallel branch must be a model node." };
-      joins.add(bOut[0]!);
+      if (!bn) return { ok: false, reason: "Branch references unknown node." };
+      if (bn.kind === "model") {
+        branches.push({ model: b });
+        joins.add(bOut[0]!);
+        visited.add(b);
+      } else if (bn.kind === "capacitor") {
+        const next = bOut[0]!;
+        const nextNode = byId.get(next);
+        const nextIn = inn.get(next) ?? [];
+        const nextOut = out.get(next) ?? [];
+        if (!nextNode || nextNode.kind !== "model") {
+          return { ok: false, reason: "Capacitor in parallel branch must be followed by a model." };
+        }
+        if (nextIn.length !== 1) return { ok: false, reason: "Branch model must have exactly one input." };
+        if (nextOut.length !== 1) return { ok: false, reason: "Branch model must have exactly one output." };
+        branches.push({ cap: b, model: next });
+        joins.add(nextOut[0]!);
+        visited.add(b);
+        visited.add(next);
+      } else {
+        return { ok: false, reason: "Parallel branch must start with a model or capacitor." };
+      }
     }
     if (joins.size !== 1) return { ok: false, reason: "Parallel branches must converge on a single join node." };
-    stages.push({ kind: "parallel", nodes: branchNodes });
+    stages.push({ kind: "parallel", branches });
     const join = [...joins][0]!;
     const joinIn = inn.get(join) ?? [];
-    if (joinIn.length !== branchNodes.length) {
+    if (joinIn.length !== branches.length) {
       return { ok: false, reason: "Join node has unexpected incoming edges." };
     }
     cursor = join;

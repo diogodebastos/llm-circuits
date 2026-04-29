@@ -55,6 +55,41 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
       edges: [{ id: "cap-m", source: "cap", target: "m" }],
     },
   },
+  codeReview: {
+    label: "Code review",
+    // Three parallel branches receive the user's code in parallel. Each branch
+    // pairs a role-specific brief capacitor (correctness / security / style)
+    // with a different model family — diverse priors plus diverse weights.
+    // Branches converge on a merge brief capacitor that feeds a merger model.
+    // Reviewer/merge nodes set explicit maxTokens because the platform default
+    // truncates code reviews mid-paragraph.
+    circuit: {
+      nodes: [
+        { kind: "capacitor", id: "cap-correct", seedSlug: "code-review-correctness", mode: "inject", position: { x: 40, y: 40 } },
+        { kind: "model", id: "correct", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 4096, position: { x: 380, y: 40 } },
+
+        { kind: "capacitor", id: "cap-security", seedSlug: "code-review-security", mode: "inject", position: { x: 40, y: 320 } },
+        { kind: "model", id: "security", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", maxTokens: 4096, position: { x: 380, y: 320 } },
+
+        { kind: "capacitor", id: "cap-style", seedSlug: "code-review-style", mode: "inject", position: { x: 40, y: 600 } },
+        { kind: "model", id: "style", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 4096, position: { x: 380, y: 600 } },
+
+        { kind: "capacitor", id: "cap-merge", seedSlug: "code-review-merge", mode: "inject", position: { x: 720, y: 320 } },
+        { kind: "model", id: "merge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 8192, position: { x: 1060, y: 320 } },
+      ],
+      edges: [
+        { id: "cap-correct-correct", source: "cap-correct", target: "correct" },
+        { id: "cap-security-security", source: "cap-security", target: "security" },
+        { id: "cap-style-style", source: "cap-style", target: "style" },
+
+        { id: "correct-cap-merge", source: "correct", target: "cap-merge" },
+        { id: "security-cap-merge", source: "security", target: "cap-merge" },
+        { id: "style-cap-merge", source: "style", target: "cap-merge" },
+
+        { id: "cap-merge-merge", source: "cap-merge", target: "merge" },
+      ],
+    },
+  },
   buildWebsite: {
     label: "Build a website",
     // Brief capacitor (inject) seeds an inductor-stabilized planner: 3 plan
