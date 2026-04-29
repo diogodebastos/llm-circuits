@@ -29,16 +29,36 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
   }
 
-  const result = await executeCircuit(
-    env.AI as unknown as { run: (m: string, i: any) => Promise<unknown> },
-    body.circuit,
-    body.mode,
-    body.prompt,
-    body.capStates ?? {},
-    body.seeds ?? {}
-  );
-  return new Response(JSON.stringify(result), {
-    status: result.ok ? 200 : 400,
-    headers: { "content-type": "application/json" },
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: object) =>
+        controller.enqueue(enc.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+      try {
+        const result = await executeCircuit(
+          env.AI as unknown as { run: (m: string, i: any) => Promise<unknown> },
+          body.circuit,
+          body.mode,
+          body.prompt,
+          body.capStates ?? {},
+          body.seeds ?? {},
+          (trace) => send({ type: "node", trace })
+        );
+        send({ type: "done", result });
+      } catch (err) {
+        send({ type: "done", result: { ok: false, trace: [], error: String(err) } });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      "x-accel-buffering": "no",
+    },
   });
 };
