@@ -59,11 +59,9 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
     label: "Build a website",
     // Brief capacitor (inject) seeds an inductor-stabilized planner: 3 plan
     // candidates collapse via vote into one spec. Spec fans out to three
-    // specialists (structure, styling, copy), a merge model fuses them, and
-    // an iteration-memory capacitor (both) carries the previous draft into
-    // the final render so follow-up prompts diff against it instead of
-    // rewriting from scratch. Prompt with something like:
-    // "a landing page for a tea shop".
+    // specialists (structure, styling, copy), a merge model fuses them,
+    // and the result goes directly to a final render model.
+    // Prompt with something like: "a landing page for a tea shop".
     circuit: {
       nodes: [
         { kind: "capacitor", id: "brief", seedSlug: "website-brief", mode: "inject", position: { x: 40, y: 280 } },
@@ -73,8 +71,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
         { kind: "model", id: "css", modelId: "@cf/google/gemma-3-12b-it", position: { x: 1060, y: 280 } },
         { kind: "model", id: "copy", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 1060, y: 560 } },
         { kind: "model", id: "merge", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 1400, y: 280 } },
-        { kind: "capacitor", id: "memory", seedSlug: "website-iter", mode: "both", position: { x: 1740, y: 280 } },
-        { kind: "model", id: "render", modelId: "@cf/qwen/qwq-32b", position: { x: 2080, y: 280 } },
+        { kind: "model", id: "render", modelId: "@cf/qwen/qwq-32b", position: { x: 1740, y: 280 } },
       ],
       edges: [
         { id: "brief-ind", source: "brief", target: "ind" },
@@ -85,8 +82,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
         { id: "html-merge", source: "html", target: "merge" },
         { id: "css-merge", source: "css", target: "merge" },
         { id: "copy-merge", source: "copy", target: "merge" },
-        { id: "merge-memory", source: "merge", target: "memory" },
-        { id: "memory-render", source: "memory", target: "render" },
+        { id: "merge-render", source: "merge", target: "render" },
       ],
     },
   },
