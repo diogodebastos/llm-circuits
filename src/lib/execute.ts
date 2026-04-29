@@ -99,7 +99,7 @@ export async function executeCircuit(
 
   let currentText = userPrompt;
   let rTotal = 0;
-  const PHYSICS_BUDGET = 512;
+  const PHYSICS_BUDGET = 5120;
 
   const applyPendingInjects = (text: string): string => {
     if (pendingInjects.length === 0) return text;
@@ -149,7 +149,7 @@ export async function executeCircuit(
       trace.prompt = promptIn;
       trace.R = spec.R;
       try {
-        const maxTokens = mode === "physics" ? PHYSICS_BUDGET : undefined;
+        const maxTokens = node.maxTokens ?? (mode === "physics" ? PHYSICS_BUDGET : undefined);
         let out: string;
         if (pendingInductor && pendingInductor.runs > 1) {
           const candidates: string[] = [];
@@ -166,8 +166,8 @@ export async function executeCircuit(
         onUpdate?.(trace);
         if (mode === "physics") {
           rTotal += spec.R;
-          trace.maxTokens = maxTokens;
         }
+        if (maxTokens != null) trace.maxTokens = maxTokens;
         currentText = out;
         // Absorbers: store this stage's output into the pending capacitors
         // and reflect the new state in their trace.
@@ -184,11 +184,22 @@ export async function executeCircuit(
         return { ok: false, trace: [...traceMap.values()], error: trace.error, capStates: capStatesOut };
       }
     } else {
-      // parallel — only model nodes allowed (validator enforced)
-      const branchSpecs = stage.nodes.map((id) => {
-        const n = byId.get(id);
+      // parallel — each branch is a model, optionally preceded by a capacitor
+      // whose inject/absorb applies only within that branch.
+      const branchSpecs = stage.branches.map((br) => {
+        const n = byId.get(br.model);
         if (!n || n.kind !== "model") throw new Error("Non-model in parallel branch");
-        return { id, spec: getModel(n.modelId) };
+        const capNode = br.cap ? byId.get(br.cap) : undefined;
+        if (br.cap && (!capNode || capNode.kind !== "capacitor")) {
+          throw new Error("Branch capacitor missing or wrong kind");
+        }
+        return {
+          id: br.model,
+          capId: br.cap,
+          capNode: capNode?.kind === "capacitor" ? capNode : undefined,
+          spec: getModel(n.modelId),
+          node: n,
+        };
       });
       let weights: number[] = [];
       let maxTokensList: (number | undefined)[] = [];
@@ -196,19 +207,33 @@ export async function executeCircuit(
         const conductances = branchSpecs.map((b) => 1 / b.spec.R);
         const sumG = conductances.reduce((a, b) => a + b, 0);
         weights = conductances.map((g) => g / sumG);
-        maxTokensList = weights.map((w) => Math.max(64, Math.round(w * PHYSICS_BUDGET)));
+        maxTokensList = branchSpecs.map((b, i) =>
+          b.node.maxTokens ?? Math.max(64, Math.round(weights[i]! * PHYSICS_BUDGET))
+        );
         const rPar = 1 / sumG;
         rTotal += rPar;
       } else {
         weights = branchSpecs.map(() => 1 / branchSpecs.length);
-        maxTokensList = branchSpecs.map(() => undefined);
+        maxTokensList = branchSpecs.map((b) => b.node.maxTokens);
       }
 
-      const branchPrompt = applyPendingInjects(currentText);
+      const branchPromptBase = applyPendingInjects(currentText);
       pendingInjects = [];
 
       const results = await Promise.all(
-        branchSpecs.map(async ({ id, spec }, i) => {
+        branchSpecs.map(async ({ id, capId, capNode, spec }, i) => {
+          let branchPrompt = branchPromptBase;
+          if (capId && capNode) {
+            const capText = getCapText(capId);
+            const capTrace = traceMap.get(capId)!;
+            capTrace.prompt = `mode=${capNode.mode} · before:\n${capText || "(empty)"}`;
+            capTrace.output = capText || "(empty)";
+            capTrace.status = "done";
+            onUpdate?.(capTrace);
+            if (capNode.mode === "inject" || capNode.mode === "both") {
+              branchPrompt = injectContext(capText, branchPrompt);
+            }
+          }
           const trace = traceMap.get(id)!;
           trace.status = "running";
           trace.prompt = branchPrompt;
@@ -220,6 +245,11 @@ export async function executeCircuit(
             trace.output = out;
             trace.status = "done";
             onUpdate?.(trace);
+            if (capId && capNode && (capNode.mode === "absorb" || capNode.mode === "both")) {
+              setCapText(capId, out);
+              const capTrace = traceMap.get(capId);
+              if (capTrace) capTrace.output = `after:\n${out}`;
+            }
             return out;
           } catch (err) {
             trace.status = "error";

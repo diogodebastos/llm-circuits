@@ -91,9 +91,9 @@ function FormattedOutput({ text }: { text: string }) {
 }
 
 const MODES: Array<{ id: CircuitMode; label: string; blurb: string }> = [
+  { id: "physics", label: "Physics-faithful", blurb: "Resistance ∝ params. Parallel splits token budget by 1/R." },
   { id: "refine-vote", label: "Refine / Vote", blurb: "Series refines prior answer. Parallel votes for consensus." },
   { id: "chain-ensemble", label: "Chain / Ensemble", blurb: "Series chains output. Parallel synthesizes via judge." },
-  { id: "physics", label: "Physics-faithful", blurb: "Resistance ∝ params. Parallel splits token budget by 1/R." },
 ];
 
 interface Seed { slug: string; title: string; body: string; }
@@ -193,7 +193,7 @@ function Inner() {
   const initial = useMemo(() => circuitToFlow(initialCircuit), [initialCircuit]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  const [mode, setMode] = useState<CircuitMode>("refine-vote");
+  const [mode, setMode] = useState<CircuitMode>("physics");
   const [prompt, setPrompt] = useState("Explain why the sky is blue in two sentences.");
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState<RunResponse | null>(null);
