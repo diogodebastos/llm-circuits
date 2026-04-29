@@ -21,6 +21,7 @@ import { MODELS } from "@/lib/models";
 import type { CapacitorMode, Circuit, CircuitMode, CircuitNode } from "@/lib/graph";
 import type { NodeTrace, RunResponse } from "@/lib/runner";
 import { runCircuit } from "@/lib/runner";
+import type { CfCreds } from "@/lib/runner";
 import { useIsMobile } from "@/lib/useIsMobile";
 import {
   encodeCircuit,
@@ -199,6 +200,23 @@ function Inner() {
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [shareMsg, setShareMsg] = useState<string>("");
   const isDark = useDarkMode();
+
+  const [cfCreds, setCfCreds] = useState<CfCreds | null>(() => {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem("llm-circuits:cfcreds");
+    if (!raw) return null;
+    try { return JSON.parse(raw) as CfCreds; } catch { return null; }
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      const raw = localStorage.getItem("llm-circuits:cfcreds");
+      if (!raw) { setCfCreds(null); return; }
+      try { setCfCreds(JSON.parse(raw) as CfCreds); } catch { setCfCreds(null); }
+    };
+    window.addEventListener("cfcreds-updated", handler);
+    return () => window.removeEventListener("cfcreds-updated", handler);
+  }, []);
 
   useEffect(() => {
     fetch("/api/capacitors")
@@ -441,7 +459,8 @@ function Inner() {
         setNodes((ns) =>
           ns.map((n) => (n.id === trace.nodeId ? { ...n, data: { ...(n.data as object), trace } } : n))
         );
-      }
+      },
+      cfCreds ?? undefined
     );
     setResponse(res);
     setRunning(false);
@@ -549,6 +568,7 @@ function Inner() {
             ))}
           </div>
         </div>
+
       </aside>
 
       {/* Canvas */}
