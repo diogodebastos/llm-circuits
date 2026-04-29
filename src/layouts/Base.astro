@@ -38,6 +38,16 @@ const { title = "LLM Circuits" } = Astro.props;
           <a href="/blog/blogpost" class="rounded px-2 py-1 text-xs tracking-wide transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:hover:bg-stone-900">Blog</a>
           <span class="mx-1 select-none text-stone-300 dark:text-stone-700">|</span>
           <button
+            id="cf-connect-btn"
+            class="flex items-center gap-1.5 rounded border border-[#f6821f] px-2.5 py-1 text-xs font-semibold text-[#f6821f] transition-colors hover:bg-[#f6821f] hover:text-white"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M16.5 8.5C16.5 5.46 14.04 3 11 3S5.5 5.46 5.5 8.5c0 .28.02.55.06.82C3.57 9.86 2 11.55 2 13.5 2 15.71 3.79 17.5 6 17.5h11c2.49 0 4.5-2.01 4.5-4.5 0-2.3-1.73-4.2-3.97-4.46a5.56 5.56 0 0 0-.03-.04z"/>
+            </svg>
+            <span id="cf-btn-label">Connect</span>
+          </button>
+          <span class="mx-1 select-none text-stone-300 dark:text-stone-700">|</span>
+          <button
             id="theme-toggle"
             aria-label="Toggle dark mode"
             class="rounded p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:text-stone-500 dark:hover:bg-stone-900"
@@ -77,12 +87,153 @@ const { title = "LLM Circuits" } = Astro.props;
         </div>
       </div>
     </footer>
+    <!-- Cloudflare credentials modal -->
+    <div id="cf-modal-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div class="w-full max-w-md rounded-xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-stone-700 dark:bg-stone-900">
+        <div class="mb-5 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#f6821f" aria-hidden="true">
+              <path d="M16.5 8.5C16.5 5.46 14.04 3 11 3S5.5 5.46 5.5 8.5c0 .28.02.55.06.82C3.57 9.86 2 11.55 2 13.5 2 15.71 3.79 17.5 6 17.5h11c2.49 0 4.5-2.01 4.5-4.5 0-2.3-1.73-4.2-3.97-4.46a5.56 5.56 0 0 0-.03-.04z"/>
+            </svg>
+            <h2 class="text-sm font-bold text-stone-900 dark:text-stone-100" style="font-family: 'Chakra Petch', monospace;">Connect your Cloudflare account</h2>
+          </div>
+          <button id="cf-modal-close" class="rounded p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <p class="mb-4 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+          Use your own Cloudflare account and token limits instead of the shared pool.
+          Create an API token at
+          <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener noreferrer" class="text-[#f6821f] hover:underline">dash.cloudflare.com/profile/api-tokens</a>
+          with <strong>Workers AI (Read)</strong> permission. Your Account ID is in the right sidebar of the Cloudflare dashboard.
+        </p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="mb-1 block text-[10px] uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Account ID</label>
+            <input
+              id="cf-account-id"
+              type="text"
+              placeholder="e.g. a1b2c3d4e5f6..."
+              spellcheck="false"
+              autocomplete="off"
+              class="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800 placeholder-stone-300 transition-colors focus:border-[#f6821f] focus:outline-none focus:ring-2 focus:ring-[#f6821f]/20 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder-stone-600"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-[10px] uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">API Token</label>
+            <input
+              id="cf-api-token"
+              type="password"
+              placeholder="Your Workers AI token"
+              autocomplete="new-password"
+              class="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800 placeholder-stone-300 transition-colors focus:border-[#f6821f] focus:outline-none focus:ring-2 focus:ring-[#f6821f]/20 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder-stone-600"
+            />
+          </div>
+        </div>
+
+        <div id="cf-modal-error" class="mt-3 hidden rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:bg-rose-950 dark:text-rose-300"></div>
+
+        <div class="mt-5 flex gap-2">
+          <button id="cf-save-btn" class="flex-1 rounded-lg bg-[#f6821f] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#e5741a]">
+            Connect
+          </button>
+          <button id="cf-clear-btn" class="hidden rounded-lg border border-stone-200 px-4 py-2 text-sm text-rose-500 transition-colors hover:bg-rose-50 dark:border-stone-700 dark:hover:bg-stone-800">
+            Disconnect
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script is:inline>
       document.getElementById('theme-toggle').addEventListener('click', function() {
         const html = document.documentElement;
         const isDark = html.classList.toggle('dark');
         localStorage.setItem('llm-circuits:theme', isDark ? 'dark' : 'light');
       });
+
+      (function() {
+        var overlay = document.getElementById('cf-modal-overlay');
+        var btn = document.getElementById('cf-connect-btn');
+        var btnLabel = document.getElementById('cf-btn-label');
+        var closeBtn = document.getElementById('cf-modal-close');
+        var accountInput = document.getElementById('cf-account-id');
+        var tokenInput = document.getElementById('cf-api-token');
+        var saveBtn = document.getElementById('cf-save-btn');
+        var clearBtn = document.getElementById('cf-clear-btn');
+        var errorBox = document.getElementById('cf-modal-error');
+
+        function loadCreds() {
+          try { return JSON.parse(localStorage.getItem('llm-circuits:cfcreds') || 'null'); } catch { return null; }
+        }
+
+        function syncBtnState() {
+          var creds = loadCreds();
+          if (creds) {
+            btnLabel.textContent = creds.accountId.slice(0, 8) + '…';
+            btn.classList.add('bg-[#f6821f]', 'text-white');
+            btn.classList.remove('text-[#f6821f]');
+            clearBtn.classList.remove('hidden');
+          } else {
+            btnLabel.textContent = 'Connect';
+            btn.classList.remove('bg-[#f6821f]', 'text-white');
+            btn.classList.add('text-[#f6821f]');
+            clearBtn.classList.add('hidden');
+          }
+        }
+
+        function openModal() {
+          var creds = loadCreds();
+          accountInput.value = creds ? creds.accountId : '';
+          tokenInput.value = creds ? creds.apiToken : '';
+          errorBox.classList.add('hidden');
+          errorBox.textContent = '';
+          overlay.classList.remove('hidden');
+          overlay.classList.add('flex');
+          accountInput.focus();
+        }
+
+        function closeModal() {
+          overlay.classList.add('hidden');
+          overlay.classList.remove('flex');
+        }
+
+        function saveCreds() {
+          var accountId = accountInput.value.trim();
+          var apiToken = tokenInput.value.trim();
+          if (!accountId || !apiToken) {
+            errorBox.textContent = 'Both Account ID and API Token are required.';
+            errorBox.classList.remove('hidden');
+            return;
+          }
+          if (!/^[a-f0-9]{32}$/.test(accountId)) {
+            errorBox.textContent = 'Account ID must be 32 hex characters (find it on your Cloudflare dashboard).';
+            errorBox.classList.remove('hidden');
+            return;
+          }
+          localStorage.setItem('llm-circuits:cfcreds', JSON.stringify({ accountId: accountId, apiToken: apiToken }));
+          window.dispatchEvent(new Event('cfcreds-updated'));
+          syncBtnState();
+          closeModal();
+        }
+
+        function clearCreds() {
+          localStorage.removeItem('llm-circuits:cfcreds');
+          window.dispatchEvent(new Event('cfcreds-updated'));
+          syncBtnState();
+          closeModal();
+        }
+
+        btn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        saveBtn.addEventListener('click', saveCreds);
+        clearBtn.addEventListener('click', clearCreds);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+        syncBtnState();
+      })();
     </script>
   </body>
 </html>

@@ -1,11 +1,17 @@
 import type { Circuit, CircuitMode } from "./graph";
 
+export interface CfCreds {
+  accountId: string;
+  apiToken: string;
+}
+
 export interface RunRequest {
   circuit: Circuit;
   mode: CircuitMode;
   prompt: string;
   capStates?: Record<string, string>;
   seeds?: Record<string, string>;
+  cfCreds?: CfCreds;
 }
 
 export interface NodeTrace {
@@ -31,12 +37,13 @@ export interface RunResponse {
 
 export async function runCircuit(
   req: RunRequest,
-  onNodeUpdate?: (trace: NodeTrace) => void
+  onNodeUpdate?: (trace: NodeTrace) => void,
+  cfCreds?: CfCreds
 ): Promise<RunResponse> {
   const res = await fetch("/api/run", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify(cfCreds ? { ...req, cfCreds } : req),
   });
   if (!res.ok) {
     return { ok: false, trace: [], error: `HTTP ${res.status}: ${await res.text()}` };

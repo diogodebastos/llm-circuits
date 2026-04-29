@@ -2,6 +2,28 @@ import type { APIRoute } from "astro";
 import { executeCircuit } from "@/lib/execute";
 import type { RunRequest } from "@/lib/runner";
 
+const CF_ACCOUNT_ID_RE = /^[a-f0-9]{32}$/;
+
+function makeRestRunner(accountId: string, apiToken: string) {
+  return {
+    async run(model: string, input: unknown): Promise<unknown> {
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        }
+      );
+      const data = (await res.json()) as { result: unknown; success: boolean; errors: unknown[] };
+      if (!res.ok || !data.success) {
+        throw new Error(`CF AI error ${res.status}: ${JSON.stringify(data.errors)}`);
+      }
+      return data.result;
+    },
+  };
+}
+
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -22,7 +44,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const env = locals.runtime?.env as { AI?: Ai } | undefined;
-  if (!env?.AI) {
+
+  let aiRunner: { run: (m: string, i: unknown) => Promise<unknown> };
+  if (body.cfCreds?.accountId && body.cfCreds?.apiToken) {
+    const { accountId, apiToken } = body.cfCreds;
+    if (!CF_ACCOUNT_ID_RE.test(accountId)) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Invalid Cloudflare account ID format (expected 32 hex chars)." }),
+        { status: 400, headers: { "content-type": "application/json" } }
+      );
+    }
+    aiRunner = makeRestRunner(accountId, apiToken);
+  } else if (env?.AI) {
+    aiRunner = env.AI as unknown as { run: (m: string, i: unknown) => Promise<unknown> };
+  } else {
     return new Response(
       JSON.stringify({ ok: false, error: "AI binding unavailable. Run with `wrangler dev --remote` or deploy." }),
       { status: 500, headers: { "content-type": "application/json" } }
@@ -37,7 +72,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
       try {
         const result = await executeCircuit(
-          env.AI as unknown as { run: (m: string, i: any) => Promise<unknown> },
+          aiRunner,
           body.circuit,
           body.mode,
           body.prompt,
