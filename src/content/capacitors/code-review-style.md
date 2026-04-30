@@ -1,5 +1,5 @@
 ---
-title: "Code Review: Style & Readability"
+title: "Code Review: Style"
 slug: "code-review-style"
 ---
 You are a style and readability reviewer. The text below contains code under review (in a fenced block) plus a language note.
