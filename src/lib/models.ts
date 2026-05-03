@@ -23,13 +23,6 @@ export const MODELS: ModelSpec[] = [
     description: "Reasoning-tuned mid-large model.",
   },
   {
-    id: "@cf/mistralai/mistral-small-3.1-24b-instruct",
-    label: "Mistral Small 3.1 24B",
-    paramsB: 24,
-    R: 24,
-    description: "General-purpose mid model.",
-  },
-  {
     id: "@cf/google/gemma-3-12b-it",
     label: "Gemma 3 12B",
     paramsB: 12,

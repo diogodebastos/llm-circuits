@@ -7,7 +7,7 @@ export const PRESETS: Record<string, { label: string; prompt?: string; circuit: 
     circuit: {
       nodes: [
         { kind: "model", id: "a", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 60, y: 160 } },
-        { kind: "model", id: "b", modelId: "@cf/qwen/qwq-32b", position: { x: 400, y: 160 } },
+        { kind: "model", id: "b", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 400, y: 160 } },
       ],
       edges: [{ id: "a-b", source: "a", target: "b" }],
     },
@@ -19,7 +19,7 @@ export const PRESETS: Record<string, { label: string; prompt?: string; circuit: 
       nodes: [
         { kind: "model", id: "src", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 40, y: 200 } },
         { kind: "model", id: "p1", modelId: "@cf/google/gemma-3-12b-it", position: { x: 380, y: 0 } },
-        { kind: "model", id: "p2", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 380, y: 400 } },
+        { kind: "model", id: "p2", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 380, y: 400 } },
         { kind: "model", id: "snk", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 720, y: 200 } },
       ],
       edges: [
@@ -54,7 +54,7 @@ export const PRESETS: Record<string, { label: string; prompt?: string; circuit: 
     circuit: {
       nodes: [
         { kind: "capacitor", id: "cap", seedSlug: "style-guide", mode: "inject", position: { x: 60, y: 160 } },
-        { kind: "model", id: "m", modelId: "@cf/qwen/qwq-32b", position: { x: 400, y: 160 } },
+        { kind: "model", id: "m", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 400, y: 160 } },
       ],
       edges: [{ id: "cap-m", source: "cap", target: "m" }],
     },
@@ -91,16 +91,16 @@ function getUserDiscount(userId, cartTotal) {
     circuit: {
       nodes: [
         { kind: "capacitor", id: "cap-correct", seedSlug: "code-review-correctness", mode: "inject", position: { x: 40, y: 40 } },
-        { kind: "model", id: "correct", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 4096, position: { x: 380, y: 40 } },
+        { kind: "model", id: "correct", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 4096, position: { x: 380, y: 40 } },
 
         { kind: "capacitor", id: "cap-security", seedSlug: "code-review-security", mode: "inject", position: { x: 40, y: 320 } },
-        { kind: "model", id: "security", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", maxTokens: 4096, position: { x: 380, y: 320 } },
+        { kind: "model", id: "security", modelId: "@cf/meta/llama-3.1-8b-instruct", maxTokens: 4096, position: { x: 380, y: 320 } },
 
         { kind: "capacitor", id: "cap-style", seedSlug: "code-review-style", mode: "inject", position: { x: 40, y: 600 } },
         { kind: "model", id: "style", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 4096, position: { x: 380, y: 600 } },
 
         { kind: "capacitor", id: "cap-merge", seedSlug: "code-review-merge", mode: "inject", position: { x: 720, y: 320 } },
-        { kind: "model", id: "merge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 8192, position: { x: 1060, y: 320 } },
+        { kind: "model", id: "merge", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 8192, position: { x: 1060, y: 320 } },
       ],
       edges: [
         { id: "cap-correct-correct", source: "cap-correct", target: "correct" },
@@ -125,13 +125,13 @@ function getUserDiscount(userId, cartTotal) {
     // averaging away the winner.
     circuit: {
       nodes: [
-        { kind: "model", id: "m1", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 2048, position: { x: 40, y: 0 } },
-        { kind: "model", id: "m2", modelId: "@cf/qwen/qwq-32b", maxTokens: 2048, position: { x: 40, y: 220 } },
-        { kind: "model", id: "m3", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", maxTokens: 2048, position: { x: 40, y: 440 } },
+        { kind: "model", id: "m1", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 2048, position: { x: 40, y: 0 } },
+        { kind: "model", id: "m2", modelId: "@cf/meta/llama-3.1-8b-instruct", maxTokens: 2048, position: { x: 40, y: 220 } },
+        { kind: "model", id: "m3", modelId: "@cf/meta/llama-3.1-8b-instruct", maxTokens: 2048, position: { x: 40, y: 440 } },
         { kind: "model", id: "m4", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 2048, position: { x: 40, y: 660 } },
 
         { kind: "capacitor", id: "cap-judge", seedSlug: "best-of-n-judge", mode: "inject", position: { x: 380, y: 330 } },
-        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", maxTokens: 4096, position: { x: 720, y: 330 } },
+        { kind: "model", id: "judge", modelId: "@cf/google/gemma-3-12b-it", maxTokens: 4096, position: { x: 720, y: 330 } },
       ],
       edges: [
         { id: "m1-cap-judge", source: "m1", target: "cap-judge" },
@@ -159,7 +159,7 @@ function getUserDiscount(userId, cartTotal) {
           onFail: "block",
           position: { x: 380, y: 160 },
         },
-        { kind: "model", id: "refiner", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 160 } },
+        { kind: "model", id: "refiner", modelId: "@cf/google/gemma-3-12b-it", position: { x: 720, y: 160 } },
       ],
       edges: [
         { id: "drafter-gate", source: "drafter", target: "gate" },
@@ -177,7 +177,7 @@ function getUserDiscount(userId, cartTotal) {
         { kind: "model", id: "src", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 40, y: 200 } },
         { kind: "transformer", id: "t1", instruction: "Rewrite the following as 3 short, plain-English bullet points. Reply with only the bullets.", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 380, y: 0 } },
         { kind: "transformer", id: "t2", instruction: "Rewrite the following as a single tight paragraph in plain English. Reply with only the paragraph.", modelId: "@cf/google/gemma-3-12b-it", position: { x: 380, y: 400 } },
-        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 200 } },
+        { kind: "model", id: "judge", modelId: "@cf/google/gemma-3-12b-it", position: { x: 720, y: 200 } },
       ],
       edges: [
         { id: "src-t1", source: "src", target: "t1" },
@@ -220,7 +220,7 @@ function getUserDiscount(userId, cartTotal) {
           onFail: "block",
           position: { x: 380, y: 480 },
         },
-        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 240 } },
+        { kind: "model", id: "judge", modelId: "@cf/google/gemma-3-12b-it", position: { x: 720, y: 240 } },
       ],
       edges: [
         { id: "src-g1", source: "src", target: "g1" },
@@ -244,12 +244,12 @@ function getUserDiscount(userId, cartTotal) {
       nodes: [
         { kind: "capacitor", id: "brief", seedSlug: "website-brief", mode: "inject", position: { x: 40, y: 280 } },
         { kind: "inductor", id: "ind", runs: 3, position: { x: 380, y: 280 } },
-        { kind: "model", id: "plan", modelId: "@cf/qwen/qwq-32b", position: { x: 720, y: 280 } },
+        { kind: "model", id: "plan", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 720, y: 280 } },
         { kind: "model", id: "html", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 1060, y: 0 } },
         { kind: "model", id: "css", modelId: "@cf/google/gemma-3-12b-it", position: { x: 1060, y: 280 } },
-        { kind: "model", id: "copy", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 1060, y: 560 } },
-        { kind: "model", id: "merge", modelId: "@cf/mistralai/mistral-small-3.1-24b-instruct", position: { x: 1400, y: 280 } },
-        { kind: "model", id: "render", modelId: "@cf/qwen/qwq-32b", position: { x: 1740, y: 280 } },
+        { kind: "model", id: "copy", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 1060, y: 560 } },
+        { kind: "model", id: "merge", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 1400, y: 280 } },
+        { kind: "model", id: "render", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 1740, y: 280 } },
       ],
       edges: [
         { id: "brief-ind", source: "brief", target: "ind" },
