@@ -7,6 +7,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 export interface TransformerNodeData {
   instruction: string;
   modelId: string;
+  readOnly?: boolean;
   trace?: NodeTrace;
   onChangeInstruction?: (s: string) => void;
   onChangeModel?: (id: string) => void;
@@ -52,24 +53,32 @@ export default function TransformerNode({ data }: { data: TransformerNodeData })
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
       </div>
 
-      <select
-        className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-amber-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        value={data.modelId}
-        onChange={(e) => data.onChangeModel?.(e.target.value)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {MODELS.map((m) => (
-          <option key={m.id} value={m.id}>{m.label}</option>
-        ))}
-      </select>
+      {data.readOnly ? (
+        <div className="rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200">
+          {MODELS.find((m) => m.id === data.modelId)?.label ?? data.modelId}
+        </div>
+      ) : (
+        <>
+          <select
+            className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-amber-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+            value={data.modelId}
+            onChange={(e) => data.onChangeModel?.(e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
 
-      <button
-        className="nodrag mt-1 w-full rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
-        onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); }}
-      >
-        {editing ? "cancel" : "✎ instruction"}
-      </button>
+          <button
+            className="nodrag mt-1 w-full rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+            onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); }}
+          >
+            {editing ? "cancel" : "✎ instruction"}
+          </button>
+        </>
+      )}
 
       {editing && (
         <div className="nodrag nowheel mt-1">

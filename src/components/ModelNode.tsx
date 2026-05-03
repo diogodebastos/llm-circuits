@@ -5,6 +5,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 
 export interface ModelNodeData {
   modelId: string;
+  readOnly?: boolean;
   trace?: NodeTrace;
   onChangeModel?: (id: string) => void;
 }
@@ -55,19 +56,25 @@ export default function ModelNode({ data }: { data: ModelNodeData }) {
         </div>
       </div>
 
-      <select
-        className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-[#f6821f] focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200 dark:hover:border-stone-700"
-        value={data.modelId}
-        onChange={(e) => data.onChangeModel?.(e.target.value)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {MODELS.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label} ({m.R}Ω)
-          </option>
-        ))}
-      </select>
+      {data.readOnly ? (
+        <div className="rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200">
+          {model?.label ?? data.modelId}
+        </div>
+      ) : (
+        <select
+          className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-[#f6821f] focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200 dark:hover:border-stone-700"
+          value={data.modelId}
+          onChange={(e) => data.onChangeModel?.(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label} ({m.R}Ω)
+            </option>
+          ))}
+        </select>
+      )}
 
       {data.trace?.status === "running" && (
         <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[#f6821f]">

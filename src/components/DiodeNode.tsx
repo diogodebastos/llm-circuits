@@ -9,6 +9,7 @@ export interface DiodeNodeData {
   pattern?: string;
   rubric?: string;
   onFail: DiodeOnFail;
+  readOnly?: boolean;
   trace?: NodeTrace;
   onChangeGate?: (g: DiodeGate) => void;
   onChangePattern?: (p: string) => void;
@@ -63,34 +64,42 @@ export default function DiodeNode({ data }: { data: DiodeNodeData }) {
         </div>
       </div>
 
-      <select
-        className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-rose-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        value={data.gate}
-        onChange={(e) => data.onChangeGate?.(e.target.value as DiodeGate)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <option value="judge">judge LLM</option>
-        <option value="regex">regex</option>
-      </select>
+      {data.readOnly ? (
+        <div className="rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200">
+          {data.gate} · {data.onFail}
+        </div>
+      ) : (
+        <>
+          <select
+            className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-rose-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+            value={data.gate}
+            onChange={(e) => data.onChangeGate?.(e.target.value as DiodeGate)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <option value="judge">judge LLM</option>
+            <option value="regex">regex</option>
+          </select>
 
-      <select
-        className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-rose-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        value={data.onFail}
-        onChange={(e) => data.onChangeOnFail?.(e.target.value as DiodeOnFail)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <option value="block">on fail: block</option>
-        <option value="passthrough">on fail: passthrough</option>
-      </select>
+          <select
+            className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-rose-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+            value={data.onFail}
+            onChange={(e) => data.onChangeOnFail?.(e.target.value as DiodeOnFail)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <option value="block">on fail: block</option>
+            <option value="passthrough">on fail: passthrough</option>
+          </select>
 
-      <button
-        className="nodrag mt-1 w-full rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
-        onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); }}
-      >
-        {editing ? "cancel" : "✎ edit gate"}
-      </button>
+          <button
+            className="nodrag mt-1 w-full rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+            onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); }}
+          >
+            {editing ? "cancel" : "✎ edit gate"}
+          </button>
+        </>
+      )}
 
       {editing && (
         <div className="nodrag nowheel mt-1 space-y-1">
