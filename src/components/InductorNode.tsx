@@ -4,6 +4,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 
 export interface InductorNodeData {
   runs: number;
+  readOnly?: boolean;
   trace?: NodeTrace;
   onChangeRuns?: (n: number) => void;
 }
@@ -51,19 +52,23 @@ export default function InductorNode({ data }: { data: InductorNodeData }) {
         </div>
       </div>
 
-      <label className="block text-[11px] text-stone-500 dark:text-stone-400">
-        runs (resists change)
-        <input
-          type="number"
-          min={1}
-          max={7}
-          value={data.runs}
-          onChange={(e) => data.onChangeRuns?.(Math.max(1, Math.min(7, Number(e.target.value))))}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-xs text-stone-700 focus:border-violet-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        />
-      </label>
+      {data.readOnly ? (
+        <div className="text-[11px] text-stone-500 dark:text-stone-400">runs ×{data.runs}</div>
+      ) : (
+        <label className="block text-[11px] text-stone-500 dark:text-stone-400">
+          runs (resists change)
+          <input
+            type="number"
+            min={1}
+            max={7}
+            value={data.runs}
+            onChange={(e) => data.onChangeRuns?.(Math.max(1, Math.min(7, Number(e.target.value))))}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-xs text-stone-700 focus:border-violet-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+          />
+        </label>
+      )}
 
       {data.trace?.status === "running" && (
         <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[#f6821f]">

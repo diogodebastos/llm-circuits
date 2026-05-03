@@ -1,5 +1,5 @@
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,7 +20,12 @@ import DiodeNode from "./DiodeNode";
 import TransformerNode from "./TransformerNode";
 import GroundNode from "./GroundNode";
 import CompareTable, { type CompareRow } from "./CompareTable";
+import TransientChart, { type TransientSeries } from "./TransientChart";
+import RunHistory from "./RunHistory";
 import { exportAsMcpTool, downloadMcpToolSpec } from "@/lib/mcp";
+import { loadHistory, pushHistory, clearHistory, type HistoryEntry } from "@/lib/history";
+import { useDarkMode } from "@/hooks/useDarkMode";
+import { usePersist } from "@/hooks/usePersist";
 import { PRESETS } from "@/lib/presets";
 import { MODELS } from "@/lib/models";
 import type { CapacitorMode, Circuit, CircuitMode, CircuitNode, DiodeGate, DiodeOnFail } from "@/lib/graph";
@@ -34,12 +39,10 @@ import {
   loadAllCapStates,
   loadCapState,
   readHashCircuit,
-  saveAutosave,
   saveCapState,
   clearAutosave,
   clearCapState,
   clearHash,
-  writeHashCircuit,
 } from "@/lib/persist";
 
 const nodeTypes = {
@@ -176,20 +179,6 @@ function flowToCircuit(nodes: Node[], edges: Edge[]): Circuit {
   };
 }
 
-function useDarkMode() {
-  const [dark, setDark] = useState(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-  );
-  useEffect(() => {
-    const obs = new MutationObserver(() =>
-      setDark(document.documentElement.classList.contains("dark"))
-    );
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return dark;
-}
-
 function SectionHeader({ label }: { label: string }) {
   return (
     <h3 className="mb-2 flex items-center gap-1.5 text-[9px] font-normal uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
@@ -209,6 +198,8 @@ function Spinner() {
 
 function Inner() {
   const isMobile = useIsMobile();
+  const readOnly =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ro") === "1";
   const initialCircuit = useMemo<Circuit>(() => {
     const fromHash = readHashCircuit();
     if (fromHash && fromHash.nodes.length > 0) return fromHash;
@@ -227,6 +218,15 @@ function Inner() {
   const [response, setResponse] = useState<RunResponse | null>(null);
   const [compareRows, setCompareRows] = useState<CompareRow[] | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [transientSeries, setTransientSeries] = useState<TransientSeries[] | null>(null);
+  const [transientRunning, setTransientRunning] = useState(false);
+  const [transientN, setTransientN] = useState(5);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [showMiniMap, setShowMiniMap] = useState(!isMobile);
+
+  const recordHistory = (entry: HistoryEntry) => {
+    setHistory(pushHistory(entry));
+  };
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [shareMsg, setShareMsg] = useState<string>("");
   const isDark = useDarkMode();
@@ -332,28 +332,34 @@ function Inner() {
           data: {
             ...d,
             seeds,
+            readOnly,
             storedChars: text.length,
             storedText: text,
-            onChangeSeed: (slug: string) => onChangeCapSeed(n.id, slug),
-            onChangeMode: (m: CapacitorMode) => onChangeCapMode(n.id, m),
-            onChangeRole: (r: "memory" | "golden") => onChangeCapRole(n.id, r),
-            onClear: () => onClearCap(n.id),
-            onSaveText: (t: string) => onSaveCapText(n.id, t),
+            ...(readOnly ? {} : {
+              onChangeSeed: (slug: string) => onChangeCapSeed(n.id, slug),
+              onChangeMode: (m: CapacitorMode) => onChangeCapMode(n.id, m),
+              onChangeRole: (r: "memory" | "golden") => onChangeCapRole(n.id, r),
+              onClear: () => onClearCap(n.id),
+              onSaveText: (t: string) => onSaveCapText(n.id, t),
+            }),
           },
         };
       }
       if (d.kind === "inductor") {
-        return { ...n, data: { ...d, onChangeRuns: (v: number) => onChangeInductorRuns(n.id, v) } };
+        return { ...n, data: { ...d, readOnly, ...(readOnly ? {} : { onChangeRuns: (v: number) => onChangeInductorRuns(n.id, v) }) } };
       }
       if (d.kind === "diode") {
         return {
           ...n,
           data: {
             ...d,
-            onChangeGate: (g: DiodeGate) => onChangeDiodeField(n.id, { gate: g }),
-            onChangePattern: (p: string) => onChangeDiodeField(n.id, { pattern: p }),
-            onChangeRubric: (r: string) => onChangeDiodeField(n.id, { rubric: r }),
-            onChangeOnFail: (m: DiodeOnFail) => onChangeDiodeField(n.id, { onFail: m }),
+            readOnly,
+            ...(readOnly ? {} : {
+              onChangeGate: (g: DiodeGate) => onChangeDiodeField(n.id, { gate: g }),
+              onChangePattern: (p: string) => onChangeDiodeField(n.id, { pattern: p }),
+              onChangeRubric: (r: string) => onChangeDiodeField(n.id, { rubric: r }),
+              onChangeOnFail: (m: DiodeOnFail) => onChangeDiodeField(n.id, { onFail: m }),
+            }),
           },
         };
       }
@@ -362,17 +368,20 @@ function Inner() {
           ...n,
           data: {
             ...d,
-            onChangeInstruction: (s: string) => onChangeTransformerField(n.id, { instruction: s }),
-            onChangeModel: (mid: string) => onChangeTransformerField(n.id, { modelId: mid }),
+            readOnly,
+            ...(readOnly ? {} : {
+              onChangeInstruction: (s: string) => onChangeTransformerField(n.id, { instruction: s }),
+              onChangeModel: (mid: string) => onChangeTransformerField(n.id, { modelId: mid }),
+            }),
           },
         };
       }
       if (d.kind === "ground") {
-        return { ...n, data: { ...d } };
+        return { ...n, data: { ...d, readOnly } };
       }
-      return { ...n, data: { ...d, onChangeModel: (mid: string) => onChangeModel(n.id, mid) } };
+      return { ...n, data: { ...d, readOnly, ...(readOnly ? {} : { onChangeModel: (mid: string) => onChangeModel(n.id, mid) }) } };
     },
-    [seeds, onChangeModel, onChangeCapSeed, onChangeCapMode, onChangeCapRole, onClearCap, onSaveCapText, onChangeInductorRuns, onChangeDiodeField, onChangeTransformerField]
+    [seeds, readOnly, onChangeModel, onChangeCapSeed, onChangeCapMode, onChangeCapRole, onClearCap, onSaveCapText, onChangeInductorRuns, onChangeDiodeField, onChangeTransformerField]
   );
 
   useEffect(() => {
@@ -400,15 +409,7 @@ function Inner() {
     }
   }, [response, setNodes]);
 
-  const persistTimer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    if (persistTimer.current) window.clearTimeout(persistTimer.current);
-    persistTimer.current = window.setTimeout(() => {
-      const c = flowToCircuit(nodes, edges);
-      saveAutosave(c);
-      writeHashCircuit(c);
-    }, 400);
-  }, [nodes, edges]);
+  usePersist(nodes, edges, flowToCircuit);
 
   const onConnect = useCallback(
     (conn: Connection) => {
@@ -435,6 +436,19 @@ function Inner() {
     clearAutosave();
     clearHash();
     newCanvas();
+  };
+
+  const copyEmbedSnippet = async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("ro", "1");
+    const snippet = `<iframe src="${url.toString()}" width="100%" height="640" frameborder="0" loading="lazy"></iframe>`;
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setShareMsg("embed copied ✓");
+      setTimeout(() => setShareMsg(""), 1500);
+    } catch {
+      setShareMsg("failed");
+    }
   };
 
   const copyShareLink = async () => {
@@ -582,6 +596,49 @@ function Inner() {
     });
   };
 
+  const onTransient = async () => {
+    setTransientRunning(true);
+    setTransientSeries(null);
+    const circuit = flowToCircuit(nodes, edges);
+    const capNodes = circuit.nodes.filter((n) => n.kind === "capacitor");
+    if (capNodes.length === 0) {
+      setTransientRunning(false);
+      return;
+    }
+    const seedMap: Record<string, string> = {};
+    for (const s of seeds) seedMap[s.slug] = s.body;
+    let capStates = loadAllCapStates(capNodes.map((n) => n.id));
+    const series: TransientSeries[] = capNodes.map((n) => ({
+      capId: n.id,
+      label: n.kind === "capacitor" ? `${n.seedSlug}#${n.id.slice(0, 4)}` : n.id,
+      values: [(capStates[n.id] ?? seedMap[(n as { seedSlug?: string }).seedSlug ?? "blank"] ?? "").length],
+    }));
+    for (let step = 0; step < Math.max(1, Math.min(10, transientN)); step++) {
+      const res = await runCircuit(
+        { circuit, mode, prompt, capStates, seeds: seedMap },
+        undefined,
+        cfCreds ?? undefined
+      );
+      capStates = { ...capStates, ...(res.capStates ?? {}) };
+      for (const s of series) {
+        s.values.push((capStates[s.capId] ?? "").length);
+      }
+      setTransientSeries(series.map((s) => ({ ...s, values: [...s.values] })));
+    }
+    // Persist final caps to localStorage so the canvas reflects the final state.
+    for (const [id, text] of Object.entries(capStates)) {
+      saveCapState(id, text);
+    }
+    setNodes((ns) =>
+      ns.map((n) =>
+        capStates[n.id] != null
+          ? { ...n, data: { ...(n.data as object), storedText: capStates[n.id], storedChars: capStates[n.id]!.length } }
+          : n
+      )
+    );
+    setTransientRunning(false);
+  };
+
   const onCompare = async () => {
     setComparing(true);
     setCompareRows(null);
@@ -597,6 +654,19 @@ function Inner() {
       )
     );
     setCompareRows(modes.map((m, i) => ({ mode: m, response: results[i]! })));
+    for (let i = 0; i < modes.length; i++) {
+      const res = results[i]!;
+      recordHistory({
+        ts: Date.now() + i,
+        mode: modes[i]!,
+        ok: res.ok,
+        rTotal: res.rTotal,
+        ms: res.telemetry?.ms,
+        calls: res.telemetry?.calls,
+        cached: res.telemetry?.cached,
+        evalScore: res.evalResult?.score,
+      });
+    }
     setComparing(false);
   };
 
@@ -627,12 +697,23 @@ function Inner() {
       cfCreds ?? undefined
     );
     setResponse(res);
+    recordHistory({
+      ts: Date.now(),
+      mode,
+      ok: res.ok,
+      rTotal: res.rTotal,
+      ms: res.telemetry?.ms,
+      calls: res.telemetry?.calls,
+      cached: res.telemetry?.cached,
+      evalScore: res.evalResult?.score,
+    });
     setRunning(false);
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)_340px]">
+    <div className={`grid grid-cols-1 gap-4 ${readOnly ? "lg:grid-cols-[minmax(0,1fr)_340px]" : "lg:grid-cols-[240px_minmax(0,1fr)_340px]"}`}>
       {/* Left sidebar */}
+      {!readOnly && (
       <aside className="space-y-0 rounded-md border border-stone-200 bg-white p-4 text-sm shadow-sm dark:border-stone-800 dark:bg-stone-950">
         <div className="sidebar-section">
           <SectionHeader label="Canvas" />
@@ -653,6 +734,12 @@ function Inner() {
             className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
           >
             <span className="mr-1.5 text-stone-300 dark:text-stone-700">⤓</span>Export as MCP tool
+          </button>
+          <button
+            onClick={copyEmbedSnippet}
+            className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+          >
+            <span className="mr-1.5 text-stone-300 dark:text-stone-700">{"</>"}</span>Embed (read-only)
           </button>
           <button onClick={resetEverything} className="w-full rounded px-2 py-1.5 text-left text-xs text-rose-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-rose-600 dark:hover:bg-stone-900 dark:hover:text-rose-400">
             <span className="mr-1.5">⟲</span>Reset
@@ -760,6 +847,7 @@ function Inner() {
         </div>
 
       </aside>
+      )}
 
       {/* Canvas */}
       <div className={`relative ${isMobile ? "min-h-[420px] h-[60vh]" : "min-h-[520px] h-[calc(100vh-220px)]"} max-h-[1200px] overflow-hidden rounded-md border border-stone-200 bg-[#faf9f6] shadow-sm dark:border-stone-800 dark:bg-stone-950`}>
@@ -784,8 +872,19 @@ function Inner() {
         >
           <Background gap={24} color={isDark ? "#292524" : "#e8e0d8"} />
           <Controls />
-          <MiniMap pannable zoomable className="!bg-white dark:!bg-stone-900" />
+          {showMiniMap && <MiniMap pannable zoomable className="!bg-white dark:!bg-stone-900" />}
         </ReactFlow>
+        <button
+          onClick={() => setShowMiniMap((v) => !v)}
+          aria-label={showMiniMap ? "Hide minimap" : "Show minimap"}
+          title={showMiniMap ? "Hide minimap" : "Show minimap"}
+          className="absolute bottom-[140px] left-[15px] z-10 flex h-[26px] w-[26px] items-center justify-center rounded border border-stone-300 bg-white text-stone-700 shadow-sm transition-colors hover:bg-stone-100 hover:text-[#f6821f] dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="1" />
+            <rect x="13" y="13" width="6" height="6" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
       </div>
 
       {/* Right output panel */}
@@ -827,13 +926,42 @@ function Inner() {
           </span>
         </button>
 
-        <button
-          onClick={onCompare}
-          disabled={running || comparing}
-          className="w-full rounded border border-stone-300 bg-white px-3 py-1.5 text-[11px] font-bold tracking-wide text-stone-700 transition-colors hover:border-[#f6821f] hover:text-[#f6821f] disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
-        >
-          {comparing ? "Comparing 3 modes…" : "⇅ Compare 3 modes"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onCompare}
+            disabled={running || comparing || transientRunning}
+            className="flex-1 rounded border border-stone-300 bg-white px-2 py-1.5 text-[11px] font-bold tracking-wide text-stone-700 transition-colors hover:border-[#f6821f] hover:text-[#f6821f] disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+          >
+            {comparing ? "Comparing…" : "⇅ Compare 3 modes"}
+          </button>
+          <div className="flex items-stretch overflow-hidden rounded border border-stone-300 dark:border-stone-700">
+            <button
+              onClick={onTransient}
+              disabled={running || comparing || transientRunning}
+              className="px-2 py-1.5 text-[11px] font-bold tracking-wide text-stone-700 transition-colors hover:bg-stone-100 hover:text-[#f6821f] disabled:opacity-50 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+            >
+              {transientRunning ? "⏱ …" : `⏱ Transient`}
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={transientN}
+              onChange={(e) => setTransientN(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+              className="w-12 border-l border-stone-300 bg-stone-50 px-1 text-center text-[11px] tabular-nums text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+            />
+          </div>
+        </div>
+
+        {transientSeries && transientSeries.length > 0 && (
+          <div>
+            <h4 className="mb-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+              <span className="inline-block h-px w-3 bg-sky-400" />
+              Transient analysis
+            </h4>
+            <TransientChart series={transientSeries} />
+          </div>
+        )}
 
         {compareRows && (
           <div>
@@ -857,6 +985,10 @@ function Inner() {
               <span className="stat-callout__unit">Ω</span>
             </div>
           </div>
+        )}
+
+        {history.length > 0 && (
+          <RunHistory entries={history} onClear={() => { clearHistory(); setHistory([]); }} />
         )}
 
         {response?.telemetry && (

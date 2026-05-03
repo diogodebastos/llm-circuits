@@ -1,6 +1,18 @@
 # LLM Circuits
 
+<p align="center">
+  <img src="public/screenshots/hero.png" alt="LLM Circuits canvas — refusal-tolerant vote with one grounded branch" width="100%" />
+</p>
+
 Wire LLMs like resistors. Built on Cloudflare Workers + Workers AI, with an Astro front-end and a React Flow canvas.
+
+## What it looks like
+
+| Refusal-tolerant vote | Physics-mode token-budget split |
+| --- | --- |
+| <img src="public/screenshots/hero.png" width="100%" /> | <img src="public/screenshots/physics-budget.png" width="100%" /> |
+
+> Screenshots live in [`public/screenshots/`](public/screenshots/). See the [capture guide](public/screenshots/README.md).
 
 ## Concept
 
@@ -48,7 +60,14 @@ State is keyed by node id in browser localStorage. The first time a capacitor is
 
 ## Free tier first
 
-Everything runs on Cloudflare's free tier. No Durable Objects, no KV, no paid Workers plan required. Workers AI free quota (10k neurons/day) covers ordinary demo traffic. Optional integrations (AI Gateway for caching, Durable Objects for shared capacitors) are documented but commented-out by default — see the blog post for the design.
+Everything runs on Cloudflare's free tier. No Durable Objects, no KV, no paid Workers plan required. Workers AI free quota (10k neurons/day) covers ordinary demo traffic. Optional integrations are documented but commented-out by default — see the blog post for the design.
+
+### Optional integrations (commented in `wrangler.toml`)
+
+- **AI Gateway** — set `AI_GATEWAY_ID` env var; calls through Workers AI are cached + logged. Per-call telemetry surfaces in the result panel.
+- **Durable Objects (globally-shared capacitors)** — uncomment the `[[durable_objects.bindings]]` block. The DO class is shipped in `worker/Capacitor.ts` and the proxy route in `src/pages/api/cap/[id].ts`. With the binding off (default), `/api/cap/*` returns `501` cleanly and the rest of the app keeps using `localStorage`. With it on, capacitors become per-slug, single-writer, strongly-consistent shared memory across browsers.
+
+A health-probe endpoint (`/api/cap/_health`) reports whether DO is bound, so the frontend can light up the "share globally" toggle automatically.
 
 ## Stack
 

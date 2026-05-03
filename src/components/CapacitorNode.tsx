@@ -10,6 +10,7 @@ export interface CapacitorNodeData {
   role?: "memory" | "golden";
   storedChars?: number;
   storedText?: string;
+  readOnly?: boolean;
   trace?: NodeTrace;
   seeds?: Array<{ slug: string; title: string }>;
   onChangeSeed?: (slug: string) => void;
@@ -67,33 +68,41 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
         </div>
       </div>
 
-      <select
-        className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-sky-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        value={data.seedSlug}
-        onChange={(e) => data.onChangeSeed?.(e.target.value)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {(data.seeds ?? []).map((s) => (
-          <option key={s.slug} value={s.slug}>
-            {s.title}
-          </option>
-        ))}
-      </select>
+      {data.readOnly ? (
+        <div className="rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200">
+          {(data.seeds ?? []).find((s) => s.slug === data.seedSlug)?.title ?? data.seedSlug} · {data.mode}
+        </div>
+      ) : (
+        <>
+          <select
+            className="nodrag nowheel w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-sky-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+            value={data.seedSlug}
+            onChange={(e) => data.onChangeSeed?.(e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {(data.seeds ?? []).map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.title}
+              </option>
+            ))}
+          </select>
 
-      <select
-        className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-sky-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
-        value={data.mode}
-        onChange={(e) => data.onChangeMode?.(e.target.value as CapacitorMode)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <option value="both">inject + absorb</option>
-        <option value="inject">inject only</option>
-        <option value="absorb">absorb only</option>
-      </select>
+          <select
+            className="nodrag nowheel mt-1 w-full rounded border border-stone-100 bg-stone-50 px-1.5 py-1 text-[11px] text-stone-700 transition-colors hover:border-stone-200 focus:border-sky-400 focus:outline-none dark:border-stone-800 dark:bg-stone-800 dark:text-stone-200"
+            value={data.mode}
+            onChange={(e) => data.onChangeMode?.(e.target.value as CapacitorMode)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <option value="both">inject + absorb</option>
+            <option value="inject">inject only</option>
+            <option value="absorb">absorb only</option>
+          </select>
+        </>
+      )}
 
-      {data.onChangeRole && (
+      {!data.readOnly && data.onChangeRole && (
         <button
           className={`nodrag mt-1 w-full rounded px-1 py-0.5 text-[10px] transition-colors ${
             data.role === "golden"
@@ -110,27 +119,29 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
         </button>
       )}
 
-      <div className="mt-1 flex gap-1">
-        <button
-          className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditing((v) => !v);
-          }}
-        >
-          {editing ? "cancel" : "✎ edit"}
-        </button>
-        <button
-          className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
-          onClick={(e) => {
-            e.stopPropagation();
-            data.onClear?.();
-            setEditing(false);
-          }}
-        >
-          reset to seed
-        </button>
-      </div>
+      {!data.readOnly && (
+        <div className="mt-1 flex gap-1">
+          <button
+            className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditing((v) => !v);
+            }}
+          >
+            {editing ? "cancel" : "✎ edit"}
+          </button>
+          <button
+            className="nodrag flex-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onClear?.();
+              setEditing(false);
+            }}
+          >
+            reset to seed
+          </button>
+        </div>
+      )}
 
       {editing && (
         <div className="nodrag nowheel mt-1">
