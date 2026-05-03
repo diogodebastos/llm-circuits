@@ -1,6 +1,21 @@
 import { JUDGE_MODEL, getModel } from "./models";
-import { validate, type Circuit, type CircuitMode } from "./graph";
+import { validate, type Circuit, type CircuitMode, type CircuitNode } from "./graph";
 import type { NodeTrace, RunResponse } from "./runner";
+
+/** Synthetic resistance for non-model endpoints — used in physics-mode parallel weighting. */
+function endpointR(node: CircuitNode): number {
+  if (node.kind === "model") return getModel(node.modelId).R;
+  if (node.kind === "transformer") return getModel(node.modelId).R;
+  if (node.kind === "diode") return 1;          // near-zero drop
+  if (node.kind === "ground") return Infinity;  // open circuit; gets near-zero conductance
+  return 0;
+}
+
+async function judgeYesNo(ai: AiRunner, rubric: string, text: string): Promise<boolean> {
+  const prompt = `${rubric}\n\nTEXT:\n${text}\n\nReply with exactly YES or NO and nothing else.`;
+  const out = await callModel(ai, JUDGE_MODEL, prompt, 8);
+  return /^\s*yes/i.test(out);
+}
 
 interface AiRunner {
   run: (model: string, input: { messages: Array<{ role: string; content: string }>; max_tokens?: number }) => Promise<unknown>;
@@ -75,7 +90,8 @@ export async function executeCircuit(
   const traceMap = new Map<string, NodeTrace>();
   const byId = new Map(circuit.nodes.map((n) => [n.id, n]));
   for (const n of circuit.nodes) {
-    traceMap.set(n.id, { nodeId: n.id, modelId: n.kind === "model" ? n.modelId : undefined, kind: n.kind, status: "pending" });
+    const modelId = n.kind === "model" || n.kind === "transformer" ? n.modelId : undefined;
+    traceMap.set(n.id, { nodeId: n.id, modelId, kind: n.kind, status: "pending" });
   }
 
   // Pending capacitor effects scheduled to apply after the next stage:
@@ -138,6 +154,88 @@ export async function executeCircuit(
         continue;
       }
 
+      if (node.kind === "ground") {
+        trace.status = "done";
+        trace.output = "(grounded — branch silenced)";
+        onUpdate?.(trace);
+        currentText = "";
+        pendingAbsorbers = [];
+        continue;
+      }
+
+      if (node.kind === "diode") {
+        trace.status = "running";
+        const probe = applyPendingInjects(currentText);
+        pendingInjects = [];
+        trace.prompt = `gate=${node.gate} · onFail=${node.onFail}\n\nINPUT:\n${probe}`;
+        onUpdate?.(trace);
+        try {
+          let pass: boolean;
+          if (node.gate === "regex") {
+            const pat = node.pattern ?? ".*";
+            pass = new RegExp(pat, "i").test(probe);
+          } else {
+            pass = await judgeYesNo(ai, node.rubric ?? "Is this answer well-formed and on-topic? Reply YES or NO.", probe);
+          }
+          if (pass) {
+            trace.status = "done";
+            trace.output = "✓ pass";
+            onUpdate?.(trace);
+            currentText = probe;
+          } else if (node.onFail === "passthrough") {
+            trace.status = "done";
+            trace.output = "✕ fail · passthrough";
+            onUpdate?.(trace);
+            currentText = probe;
+          } else {
+            // block: silence the branch (currentText becomes empty; downstream join filters)
+            trace.status = "done";
+            trace.output = "✕ fail · blocked";
+            onUpdate?.(trace);
+            currentText = "";
+            pendingAbsorbers = [];
+          }
+        } catch (err) {
+          trace.status = "error";
+          trace.error = err instanceof Error ? err.message : String(err);
+          onUpdate?.(trace);
+          return { ok: false, trace: [...traceMap.values()], error: trace.error, capStates: capStatesOut };
+        }
+        continue;
+      }
+
+      if (node.kind === "transformer") {
+        const spec = getModel(node.modelId);
+        trace.status = "running";
+        onUpdate?.(trace);
+        const promptIn = applyPendingInjects(`${node.instruction}\n\nINPUT:\n${currentText}`);
+        pendingInjects = [];
+        trace.prompt = promptIn;
+        trace.R = spec.R;
+        try {
+          const maxTokens = node.maxTokens ?? (mode === "physics" ? PHYSICS_BUDGET : undefined);
+          const out = await callModel(ai, spec.id, promptIn, maxTokens);
+          trace.output = out;
+          trace.status = "done";
+          if (maxTokens != null) trace.maxTokens = maxTokens;
+          onUpdate?.(trace);
+          if (mode === "physics") rTotal += spec.R;
+          currentText = out;
+          for (const capId of pendingAbsorbers) {
+            setCapText(capId, out);
+            const capTrace = traceMap.get(capId);
+            if (capTrace) capTrace.output = `after:\n${out}`;
+          }
+          pendingAbsorbers = [];
+        } catch (err) {
+          trace.status = "error";
+          trace.error = err instanceof Error ? err.message : String(err);
+          onUpdate?.(trace);
+          return { ok: false, trace: [...traceMap.values()], error: trace.error, capStates: capStatesOut };
+        }
+        continue;
+      }
+
       // model node
       const spec = getModel(node.modelId);
       trace.status = "running";
@@ -184,44 +282,48 @@ export async function executeCircuit(
         return { ok: false, trace: [...traceMap.values()], error: trace.error, capStates: capStatesOut };
       }
     } else {
-      // parallel — each branch is a model, optionally preceded by a capacitor
-      // whose inject/absorb applies only within that branch.
+      // parallel — each branch is an endpoint (model/diode/transformer/ground),
+      // optionally preceded by a capacitor whose inject/absorb applies only
+      // within that branch.
       const branchSpecs = stage.branches.map((br) => {
         const n = byId.get(br.model);
-        if (!n || n.kind !== "model") throw new Error("Non-model in parallel branch");
+        if (!n) throw new Error("Branch endpoint missing");
         const capNode = br.cap ? byId.get(br.cap) : undefined;
         if (br.cap && (!capNode || capNode.kind !== "capacitor")) {
           throw new Error("Branch capacitor missing or wrong kind");
         }
+        const R = endpointR(n);
         return {
           id: br.model,
           capId: br.cap,
           capNode: capNode?.kind === "capacitor" ? capNode : undefined,
-          spec: getModel(n.modelId),
+          R,
           node: n,
         };
       });
       let weights: number[] = [];
       let maxTokensList: (number | undefined)[] = [];
       if (mode === "physics") {
-        const conductances = branchSpecs.map((b) => 1 / b.spec.R);
-        const sumG = conductances.reduce((a, b) => a + b, 0);
+        const conductances = branchSpecs.map((b) => (Number.isFinite(b.R) && b.R > 0 ? 1 / b.R : 0));
+        const sumG = conductances.reduce((a, b) => a + b, 0) || 1;
         weights = conductances.map((g) => g / sumG);
-        maxTokensList = branchSpecs.map((b, i) =>
-          b.node.maxTokens ?? Math.max(64, Math.round(weights[i]! * PHYSICS_BUDGET))
-        );
+        maxTokensList = branchSpecs.map((b, i) => {
+          if (b.node.kind === "ground" || b.node.kind === "diode") return undefined;
+          const cap = (b.node as { maxTokens?: number }).maxTokens;
+          return cap ?? Math.max(64, Math.round(weights[i]! * PHYSICS_BUDGET));
+        });
         const rPar = 1 / sumG;
         rTotal += rPar;
       } else {
         weights = branchSpecs.map(() => 1 / branchSpecs.length);
-        maxTokensList = branchSpecs.map((b) => b.node.maxTokens);
+        maxTokensList = branchSpecs.map((b) => (b.node as { maxTokens?: number }).maxTokens);
       }
 
       const branchPromptBase = applyPendingInjects(currentText);
       pendingInjects = [];
 
       const results = await Promise.all(
-        branchSpecs.map(async ({ id, capId, capNode, spec }, i) => {
+        branchSpecs.map(async ({ id, capId, capNode, R, node: bnode }, i) => {
           let branchPrompt = branchPromptBase;
           if (capId && capNode) {
             const capText = getCapText(capId);
@@ -235,13 +337,57 @@ export async function executeCircuit(
             }
           }
           const trace = traceMap.get(id)!;
+
+          if (bnode.kind === "ground") {
+            trace.status = "done";
+            trace.output = "(grounded — silenced)";
+            onUpdate?.(trace);
+            return "";
+          }
+
+          if (bnode.kind === "diode") {
+            trace.status = "running";
+            trace.prompt = `gate=${bnode.gate} · onFail=${bnode.onFail}\n\nINPUT:\n${branchPrompt}`;
+            onUpdate?.(trace);
+            try {
+              let pass: boolean;
+              if (bnode.gate === "regex") {
+                pass = new RegExp(bnode.pattern ?? ".*", "i").test(branchPrompt);
+              } else {
+                pass = await judgeYesNo(ai, bnode.rubric ?? "Is this on-topic? YES or NO.", branchPrompt);
+              }
+              if (pass) {
+                trace.status = "done";
+                trace.output = "✓ pass";
+                onUpdate?.(trace);
+                return branchPrompt;
+              }
+              trace.status = "done";
+              trace.output = bnode.onFail === "passthrough" ? "✕ fail · passthrough" : "✕ fail · blocked";
+              onUpdate?.(trace);
+              return bnode.onFail === "passthrough" ? branchPrompt : "";
+            } catch (err) {
+              trace.status = "error";
+              trace.error = err instanceof Error ? err.message : String(err);
+              onUpdate?.(trace);
+              return "";
+            }
+          }
+
+          // model or transformer
+          const modelId = (bnode as { modelId: string }).modelId;
+          const spec = getModel(modelId);
+          const promptForCall =
+            bnode.kind === "transformer"
+              ? `${(bnode as { instruction: string }).instruction}\n\nINPUT:\n${branchPrompt}`
+              : branchPrompt;
           trace.status = "running";
-          trace.prompt = branchPrompt;
+          trace.prompt = promptForCall;
           trace.R = spec.R;
           trace.maxTokens = maxTokensList[i];
           onUpdate?.(trace);
           try {
-            const out = await callModel(ai, spec.id, branchPrompt, maxTokensList[i]);
+            const out = await callModel(ai, spec.id, promptForCall, maxTokensList[i]);
             trace.output = out;
             trace.status = "done";
             onUpdate?.(trace);
@@ -260,10 +406,17 @@ export async function executeCircuit(
         })
       );
 
+      // Filter silenced (grounded / blocked) branches before combining.
+      const survivors = results.map((r, i) => ({ r, w: weights[i]! })).filter((s) => s.r.length > 0);
+      const survivorOutputs = survivors.map((s) => s.r);
+      const survivorWeights = survivors.map((s) => s.w);
+
       let combined: string;
-      if (mode === "chain-ensemble") combined = await combineEnsemble(ai, userPrompt, results);
-      else if (mode === "refine-vote") combined = await combineVote(ai, userPrompt, results);
-      else combined = combinePhysics(results, weights);
+      if (survivorOutputs.length === 0) {
+        combined = "";
+      } else if (mode === "chain-ensemble") combined = await combineEnsemble(ai, userPrompt, survivorOutputs);
+      else if (mode === "refine-vote") combined = await combineVote(ai, userPrompt, survivorOutputs);
+      else combined = combinePhysics(survivorOutputs, survivorWeights);
 
       currentText = combined;
       for (const capId of pendingAbsorbers) {
@@ -275,11 +428,36 @@ export async function executeCircuit(
     }
   }
 
+  // Eval: if any capacitor has role=golden, score the final output against it.
+  let evalResult: RunResponse["evalResult"];
+  const goldenCap = circuit.nodes.find((n) => n.kind === "capacitor" && n.role === "golden");
+  if (goldenCap && currentText) {
+    try {
+      const golden = getCapText(goldenCap.id);
+      if (golden.trim()) {
+        const judgePrompt =
+          `You are an evaluator. Score the CANDIDATE answer 0-10 for how well it matches the GOLDEN answer ` +
+          `(content fidelity, completeness, correctness). Reply with one line of JSON: {"score": N, "why": "..."}\n\n` +
+          `GOLDEN:\n${golden}\n\nCANDIDATE:\n${currentText}\n\nJSON:`;
+        const raw = await callModel(ai, JUDGE_MODEL, judgePrompt, 200);
+        const m = raw.match(/\{[^}]*\}/);
+        if (m) {
+          const parsed = JSON.parse(m[0]) as { score?: number; why?: string };
+          const score = Math.max(0, Math.min(10, Number(parsed.score) || 0));
+          evalResult = { score, rationale: String(parsed.why ?? ""), goldenCapId: goldenCap.id };
+        }
+      }
+    } catch {
+      // soft-fail: scoring is best-effort
+    }
+  }
+
   return {
     ok: true,
     finalOutput: currentText,
     rTotal: mode === "physics" ? rTotal : undefined,
     trace: [...traceMap.values()],
     capStates: capStatesOut,
+    evalResult,
   };
 }

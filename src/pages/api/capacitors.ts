@@ -5,7 +5,7 @@ export const prerender = false;
 
 export const GET: APIRoute = async () => {
   const entries = await getCollection("capacitors");
-  const out = entries.map((e) => ({
+  const out = entries.map((e: { data: { slug: string; title: string }; body?: string }) => ({
     slug: e.data.slug,
     title: e.data.title,
     body: e.body ?? "",

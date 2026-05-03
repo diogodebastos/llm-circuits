@@ -1,8 +1,9 @@
 import type { Circuit } from "./graph";
 
-export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
+export const PRESETS: Record<string, { label: string; prompt?: string; circuit: Circuit }> = {
   series2: {
     label: "LLMs in series",
+    prompt: "Explain why the sky is blue in two sentences.",
     circuit: {
       nodes: [
         { kind: "model", id: "a", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 60, y: 160 } },
@@ -13,6 +14,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
   },
   parallel2: {
     label: "LLMs in parallel",
+    prompt: "List three surprising facts about octopuses.",
     circuit: {
       nodes: [
         { kind: "model", id: "src", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 40, y: 200 } },
@@ -30,6 +32,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
   },
   scratchpadMemory: {
     label: "Capacitor: memory",
+    prompt: "What is photosynthesis?",
     // Scratchpad in inject+absorb mode: the LLM's previous answer gets stored
     // and re-injected on the next run. Apply two prompts in sequence (e.g.
     // "what is photosynthesis?" then "give me an analogy for that") and watch
@@ -44,6 +47,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
   },
   styleInject: {
     label: "Capacitor: style inject",
+    prompt: "Describe the ocean.",
     // Inject a style-guide capacitor before the LLM. Run the same vague prompt
     // with and without it to see the seed take effect. Inject-only: state never
     // changes, just shapes every answer.
@@ -57,6 +61,27 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
   },
   codeReview: {
     label: "Code review",
+    prompt: `Review this code:
+
+\`\`\`js
+function getUserDiscount(userId, cartTotal) {
+    const sql = "SELECT tier FROM users WHERE id = " + userId;
+    const tier = db.queryRaw(sql)[0].tier;
+
+    let discount = 0
+    if (tier == "gold") discount = 0.2
+    else if (tier = "silver") discount = 0.1
+
+    const password = "admin123";
+    console.log("Applying discount for user " + userId + " pw=" + password);
+
+    for (var i = 0; i <= cartTotal.items.length; i++) {
+        cartTotal.items[i].price = cartTotal.items[i].price * (1 - discount);
+    }
+
+    return cartTotal;
+}
+\`\`\``,
     // Three parallel branches receive the user's code in parallel. Each branch
     // pairs a role-specific brief capacitor (correctness / security / style)
     // with a different model family — diverse priors plus diverse weights.
@@ -92,6 +117,7 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
   },
   bestOfFour: {
     label: "Best of four",
+    prompt: "Write a short, vivid haiku about debugging code at 3am.",
     // Four diverse models answer the same prompt in parallel. A judge brief
     // capacitor concatenates their answers and instructs a judge model to
     // return the single best answer verbatim — no merging, no editing.
@@ -116,8 +142,99 @@ export const PRESETS: Record<string, { label: string; circuit: Circuit }> = {
       ],
     },
   },
+  diodeGuarded: {
+    label: "Diode: guarded chain",
+    prompt: "Who painted the ceiling of the Sistine Chapel, and in what years?",
+    // A small model answers; a judge-mode diode checks whether the answer is
+    // factually grounded; pass → final model refines, fail → branch is blocked
+    // and the run halts cleanly.
+    circuit: {
+      nodes: [
+        { kind: "model", id: "drafter", modelId: "@cf/meta/llama-3.2-3b-instruct", position: { x: 40, y: 160 } },
+        {
+          kind: "diode",
+          id: "gate",
+          gate: "judge",
+          rubric: "Is this answer specific, on-topic, and free of obvious hallucination? Reply YES or NO.",
+          onFail: "block",
+          position: { x: 380, y: 160 },
+        },
+        { kind: "model", id: "refiner", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 160 } },
+      ],
+      edges: [
+        { id: "drafter-gate", source: "drafter", target: "gate" },
+        { id: "gate-refiner", source: "gate", target: "refiner" },
+      ],
+    },
+  },
+  transformerTranslate: {
+    label: "Transformer: translate-then-judge",
+    prompt: "Summarize the plot of Hamlet.",
+    // Two parallel reviewer models answer in their own register; transformers
+    // normalize each output to English bullet points; judge picks the best.
+    circuit: {
+      nodes: [
+        { kind: "model", id: "src", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 40, y: 200 } },
+        { kind: "transformer", id: "t1", instruction: "Rewrite the following as 3 short, plain-English bullet points. Reply with only the bullets.", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 380, y: 0 } },
+        { kind: "transformer", id: "t2", instruction: "Rewrite the following as a single tight paragraph in plain English. Reply with only the paragraph.", modelId: "@cf/google/gemma-3-12b-it", position: { x: 380, y: 400 } },
+        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 200 } },
+      ],
+      edges: [
+        { id: "src-t1", source: "src", target: "t1" },
+        { id: "src-t2", source: "src", target: "t2" },
+        { id: "t1-judge", source: "t1", target: "judge" },
+        { id: "t2-judge", source: "t2", target: "judge" },
+      ],
+    },
+  },
+  groundedVote: {
+    label: "Ground: refusal-tolerant vote",
+    prompt: "What causes a rainbow to form after rain?",
+    // A source model drafts an answer. Three parallel judge-mode diodes each
+    // check a different criterion (factual / on-topic / non-refusal). A diode
+    // that fails grounds its branch out; survivors feed the final judge.
+    circuit: {
+      nodes: [
+        { kind: "model", id: "src", modelId: "@cf/meta/llama-3.1-8b-instruct", position: { x: 40, y: 240 } },
+        {
+          kind: "diode",
+          id: "g1",
+          gate: "judge",
+          rubric: "Is this answer factually grounded (no obvious hallucination)? Reply YES or NO.",
+          onFail: "block",
+          position: { x: 380, y: 0 },
+        },
+        {
+          kind: "diode",
+          id: "g2",
+          gate: "judge",
+          rubric: "Does this answer directly address the user's question? Reply YES or NO.",
+          onFail: "block",
+          position: { x: 380, y: 240 },
+        },
+        {
+          kind: "diode",
+          id: "g3",
+          gate: "regex",
+          pattern: "[a-z]{40,}",
+          onFail: "block",
+          position: { x: 380, y: 480 },
+        },
+        { kind: "model", id: "judge", modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", position: { x: 720, y: 240 } },
+      ],
+      edges: [
+        { id: "src-g1", source: "src", target: "g1" },
+        { id: "src-g2", source: "src", target: "g2" },
+        { id: "src-g3", source: "src", target: "g3" },
+        { id: "g1-judge", source: "g1", target: "judge" },
+        { id: "g2-judge", source: "g2", target: "judge" },
+        { id: "g3-judge", source: "g3", target: "judge" },
+      ],
+    },
+  },
   buildWebsite: {
     label: "Build a website",
+    prompt: "a landing page for a tea shop",
     // Brief capacitor (inject) seeds an inductor-stabilized planner: 3 plan
     // candidates collapse via vote into one spec. Spec fans out to three
     // specialists (structure, styling, copy), a merge model fuses them,

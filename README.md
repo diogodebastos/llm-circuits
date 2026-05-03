@@ -8,6 +8,9 @@ Wire LLMs like resistors. Built on Cloudflare Workers + Workers AI, with an Astr
 - **Resistor** — a model (resistance ∝ parameter count)
 - **Capacitor** — a memory slot. Holds text across runs; can inject into the next prompt and/or absorb the next output. Seeded from markdown files, persisted per-node in localStorage, editable in the UI.
 - **Inductor** — resists change. Runs the next model N times on the same input and judge-votes for the most consistent answer.
+- **Diode** — one-way gate. Regex- or judge-LLM-based pass/fail check. Blocks the branch on failure (or annotates and passes through).
+- **Transformer** — branch-local reformat node. A small instructed model that translates / summarises / reshapes its branch's text without changing topology.
+- **Ground** — refusal sink. A grounded branch silently drops out of the parallel join.
 - **Series** — chain of components
 - **Parallel** — fan-out of models that converge at a join node
 
@@ -39,6 +42,13 @@ State is keyed by node id in browser localStorage. The first time a capacitor is
 - **Capacitor — style inject** — `style-guide` capacitor in inject-only mode shapes every answer.
 - **Capacitor — scratchpad memory** — empty scratchpad in `both` mode; two consecutive runs build conversational memory.
 - **Inductor — stabilize a small LLM** — inductor ×3 in front of a small model resists noise on ambiguous prompts.
+- **Diode — guarded chain** — judge-mode diode gates a small model's output; failures block the pipeline.
+- **Transformer — translate then judge** — parallel branches answer, a transformer converts each to a common format, judge picks the best.
+- **Ground — refusal-tolerant vote** — three reviewer branches; any branch whose diode fails grounds out, vote proceeds with the survivors.
+
+## Free tier first
+
+Everything runs on Cloudflare's free tier. No Durable Objects, no KV, no paid Workers plan required. Workers AI free quota (10k neurons/day) covers ordinary demo traffic. Optional integrations (AI Gateway for caching, Durable Objects for shared capacitors) are documented but commented-out by default — see the blog post for the design.
 
 ## Stack
 
@@ -74,6 +84,9 @@ src/
   components/ModelNode.tsx         resistor (LLM) node
   components/CapacitorNode.tsx     memory node with in-place editor
   components/InductorNode.tsx      self-vote stabilizer
+  components/DiodeNode.tsx         regex/judge gate
+  components/TransformerNode.tsx   instructed-reformat node
+  components/GroundNode.tsx        refusal sink
   lib/models.ts                    Workers AI model IDs + R values
   lib/graph.ts                     discriminated CircuitNode union + topology validation
   lib/presets.ts                   the five starter circuits
