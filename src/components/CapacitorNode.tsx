@@ -7,12 +7,14 @@ import { useIsMobile } from "@/lib/useIsMobile";
 export interface CapacitorNodeData {
   seedSlug: string;
   mode: CapacitorMode;
+  role?: "memory" | "golden";
   storedChars?: number;
   storedText?: string;
   trace?: NodeTrace;
   seeds?: Array<{ slug: string; title: string }>;
   onChangeSeed?: (slug: string) => void;
   onChangeMode?: (mode: CapacitorMode) => void;
+  onChangeRole?: (role: "memory" | "golden") => void;
   onClear?: () => void;
   onSaveText?: (text: string) => void;
 }
@@ -90,6 +92,23 @@ export default function CapacitorNode({ data }: { data: CapacitorNodeData }) {
         <option value="inject">inject only</option>
         <option value="absorb">absorb only</option>
       </select>
+
+      {data.onChangeRole && (
+        <button
+          className={`nodrag mt-1 w-full rounded px-1 py-0.5 text-[10px] transition-colors ${
+            data.role === "golden"
+              ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-200"
+              : "bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-700"
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onChangeRole?.(data.role === "golden" ? "memory" : "golden");
+          }}
+          title="Mark as golden answer for eval-mode scoring"
+        >
+          {data.role === "golden" ? "★ golden answer" : "☆ mark as golden"}
+        </button>
+      )}
 
       <div className="mt-1 flex gap-1">
         <button

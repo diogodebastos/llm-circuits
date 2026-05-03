@@ -16,9 +16,14 @@ import {
 import ModelNode from "./ModelNode";
 import CapacitorNode from "./CapacitorNode";
 import InductorNode from "./InductorNode";
+import DiodeNode from "./DiodeNode";
+import TransformerNode from "./TransformerNode";
+import GroundNode from "./GroundNode";
+import CompareTable, { type CompareRow } from "./CompareTable";
+import { exportAsMcpTool, downloadMcpToolSpec } from "@/lib/mcp";
 import { PRESETS } from "@/lib/presets";
 import { MODELS } from "@/lib/models";
-import type { CapacitorMode, Circuit, CircuitMode, CircuitNode } from "@/lib/graph";
+import type { CapacitorMode, Circuit, CircuitMode, CircuitNode, DiodeGate, DiodeOnFail } from "@/lib/graph";
 import type { NodeTrace, RunResponse } from "@/lib/runner";
 import { runCircuit } from "@/lib/runner";
 import type { CfCreds } from "@/lib/runner";
@@ -37,7 +42,14 @@ import {
   writeHashCircuit,
 } from "@/lib/persist";
 
-const nodeTypes = { modelNode: ModelNode, capacitorNode: CapacitorNode, inductorNode: InductorNode };
+const nodeTypes = {
+  modelNode: ModelNode,
+  capacitorNode: CapacitorNode,
+  inductorNode: InductorNode,
+  diodeNode: DiodeNode,
+  transformerNode: TransformerNode,
+  groundNode: GroundNode,
+};
 
 function CodeBlock({ lang, content }: { lang: string; content: string }) {
   const [copied, setCopied] = useState(false);
@@ -99,22 +111,35 @@ const MODES: Array<{ id: CircuitMode; label: string; blurb: string }> = [
 interface Seed { slug: string; title: string; body: string; }
 
 function nodeKindToType(kind: CircuitNode["kind"]): string {
-  return kind === "capacitor" ? "capacitorNode" : kind === "inductor" ? "inductorNode" : "modelNode";
+  switch (kind) {
+    case "capacitor": return "capacitorNode";
+    case "inductor": return "inductorNode";
+    case "diode": return "diodeNode";
+    case "transformer": return "transformerNode";
+    case "ground": return "groundNode";
+    default: return "modelNode";
+  }
 }
 
 function circuitToFlow(c: Circuit): { nodes: Node[]; edges: Edge[] } {
   return {
-    nodes: c.nodes.map((n) => ({
-      id: n.id,
-      type: nodeKindToType(n.kind),
-      position: n.position ?? { x: 0, y: 0 },
-      data:
-        n.kind === "model"
-          ? { kind: "model", modelId: n.modelId }
-          : n.kind === "capacitor"
-            ? { kind: "capacitor", seedSlug: n.seedSlug, mode: n.mode }
-            : { kind: "inductor", runs: n.runs },
-    })),
+    nodes: c.nodes.map((n) => {
+      let data: Record<string, unknown>;
+      switch (n.kind) {
+        case "model": data = { kind: "model", modelId: n.modelId }; break;
+        case "capacitor": data = { kind: "capacitor", seedSlug: n.seedSlug, mode: n.mode, role: n.role }; break;
+        case "inductor": data = { kind: "inductor", runs: n.runs }; break;
+        case "diode": data = { kind: "diode", gate: n.gate, pattern: n.pattern, rubric: n.rubric, onFail: n.onFail }; break;
+        case "transformer": data = { kind: "transformer", instruction: n.instruction, modelId: n.modelId }; break;
+        case "ground": data = { kind: "ground" }; break;
+      }
+      return {
+        id: n.id,
+        type: nodeKindToType(n.kind),
+        position: n.position ?? { x: 0, y: 0 },
+        data,
+      };
+    }),
     edges: c.edges.map((e) => ({
       id: e.id,
       source: e.source,
@@ -140,8 +165,11 @@ function flowToCircuit(nodes: Node[], edges: Edge[]): Circuit {
     nodes: nodes.map((n) => {
       const d = n.data as any;
       const base = { id: n.id, position: n.position };
-      if (d.kind === "capacitor") return { kind: "capacitor", ...base, seedSlug: d.seedSlug ?? "blank", mode: (d.mode as CapacitorMode) ?? "both" };
+      if (d.kind === "capacitor") return { kind: "capacitor", ...base, seedSlug: d.seedSlug ?? "blank", mode: (d.mode as CapacitorMode) ?? "both", ...(d.role === "golden" ? { role: "golden" as const } : {}) };
       if (d.kind === "inductor") return { kind: "inductor", ...base, runs: Number(d.runs ?? 3) };
+      if (d.kind === "diode") return { kind: "diode", ...base, gate: (d.gate as DiodeGate) ?? "judge", pattern: d.pattern, rubric: d.rubric, onFail: (d.onFail as DiodeOnFail) ?? "block" };
+      if (d.kind === "transformer") return { kind: "transformer", ...base, instruction: String(d.instruction ?? ""), modelId: String(d.modelId ?? "@cf/meta/llama-3.1-8b-instruct") };
+      if (d.kind === "ground") return { kind: "ground", ...base };
       return { kind: "model", ...base, modelId: d.modelId };
     }),
     edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
@@ -197,6 +225,8 @@ function Inner() {
   const [prompt, setPrompt] = useState("Explain why the sky is blue in two sentences.");
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState<RunResponse | null>(null);
+  const [compareRows, setCompareRows] = useState<CompareRow[] | null>(null);
+  const [comparing, setComparing] = useState(false);
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [shareMsg, setShareMsg] = useState<string>("");
   const isDark = useDarkMode();
@@ -221,7 +251,7 @@ function Inner() {
   useEffect(() => {
     fetch("/api/capacitors")
       .then((r) => r.json())
-      .then((s: Seed[]) => setSeeds(s))
+      .then((s) => setSeeds(s as Seed[]))
       .catch(() => setSeeds([]));
   }, []);
 
@@ -240,6 +270,12 @@ function Inner() {
   const onChangeCapMode = useCallback(
     (nodeId: string, m: CapacitorMode) => {
       setNodes((ns) => ns.map((n) => (n.id === nodeId ? { ...n, data: { ...(n.data as object), mode: m } } : n)));
+    },
+    [setNodes]
+  );
+  const onChangeCapRole = useCallback(
+    (nodeId: string, role: "memory" | "golden") => {
+      setNodes((ns) => ns.map((n) => (n.id === nodeId ? { ...n, data: { ...(n.data as object), role } } : n)));
     },
     [setNodes]
   );
@@ -271,6 +307,18 @@ function Inner() {
     },
     [setNodes]
   );
+  const onChangeDiodeField = useCallback(
+    (nodeId: string, patch: Record<string, unknown>) => {
+      setNodes((ns) => ns.map((node) => (node.id === nodeId ? { ...node, data: { ...(node.data as object), ...patch } } : node)));
+    },
+    [setNodes]
+  );
+  const onChangeTransformerField = useCallback(
+    (nodeId: string, patch: Record<string, unknown>) => {
+      setNodes((ns) => ns.map((node) => (node.id === nodeId ? { ...node, data: { ...(node.data as object), ...patch } } : node)));
+    },
+    [setNodes]
+  );
 
   const decorate = useCallback(
     (n: Node): Node => {
@@ -288,6 +336,7 @@ function Inner() {
             storedText: text,
             onChangeSeed: (slug: string) => onChangeCapSeed(n.id, slug),
             onChangeMode: (m: CapacitorMode) => onChangeCapMode(n.id, m),
+            onChangeRole: (r: "memory" | "golden") => onChangeCapRole(n.id, r),
             onClear: () => onClearCap(n.id),
             onSaveText: (t: string) => onSaveCapText(n.id, t),
           },
@@ -296,9 +345,34 @@ function Inner() {
       if (d.kind === "inductor") {
         return { ...n, data: { ...d, onChangeRuns: (v: number) => onChangeInductorRuns(n.id, v) } };
       }
+      if (d.kind === "diode") {
+        return {
+          ...n,
+          data: {
+            ...d,
+            onChangeGate: (g: DiodeGate) => onChangeDiodeField(n.id, { gate: g }),
+            onChangePattern: (p: string) => onChangeDiodeField(n.id, { pattern: p }),
+            onChangeRubric: (r: string) => onChangeDiodeField(n.id, { rubric: r }),
+            onChangeOnFail: (m: DiodeOnFail) => onChangeDiodeField(n.id, { onFail: m }),
+          },
+        };
+      }
+      if (d.kind === "transformer") {
+        return {
+          ...n,
+          data: {
+            ...d,
+            onChangeInstruction: (s: string) => onChangeTransformerField(n.id, { instruction: s }),
+            onChangeModel: (mid: string) => onChangeTransformerField(n.id, { modelId: mid }),
+          },
+        };
+      }
+      if (d.kind === "ground") {
+        return { ...n, data: { ...d } };
+      }
       return { ...n, data: { ...d, onChangeModel: (mid: string) => onChangeModel(n.id, mid) } };
     },
-    [seeds, onChangeModel, onChangeCapSeed, onChangeCapMode, onClearCap, onSaveCapText, onChangeInductorRuns]
+    [seeds, onChangeModel, onChangeCapSeed, onChangeCapMode, onChangeCapRole, onClearCap, onSaveCapText, onChangeInductorRuns, onChangeDiodeField, onChangeTransformerField]
   );
 
   useEffect(() => {
@@ -344,10 +418,12 @@ function Inner() {
   );
 
   const loadPreset = (key: keyof typeof PRESETS) => {
-    const c = isMobile ? rotateForMobile(PRESETS[key]!.circuit) : PRESETS[key]!.circuit;
+    const preset = PRESETS[key]!;
+    const c = isMobile ? rotateForMobile(preset.circuit) : preset.circuit;
     const f = circuitToFlow(c);
     setNodes(f.nodes.map(decorate));
     setEdges(f.edges);
+    if (preset.prompt !== undefined) setPrompt(preset.prompt);
   };
 
   const newCanvas = () => {
@@ -410,9 +486,79 @@ function Inner() {
             storedText: seeds.find((s) => s.slug === seedSlug)?.body ?? "",
             onChangeSeed: (slug: string) => onChangeCapSeed(id, slug),
             onChangeMode: (m: CapacitorMode) => onChangeCapMode(id, m),
+            onChangeRole: (r: "memory" | "golden") => onChangeCapRole(id, r),
             onClear: () => onClearCap(id),
             onSaveText: (t: string) => onSaveCapText(id, t),
           },
+        },
+      ];
+    });
+  };
+
+  const addDiode = () => {
+    const id = `d${Date.now().toString(36)}`;
+    setNodes((ns) => {
+      const maxX = ns.reduce((m, n) => Math.max(m, n.position?.x ?? 0), -Infinity);
+      const x = ns.length === 0 ? 80 : maxX + 240;
+      const y = 160 + (ns.length % 2 === 0 ? 0 : 40);
+      return [
+        ...ns,
+        {
+          id,
+          type: "diodeNode",
+          position: { x, y },
+          data: {
+            kind: "diode",
+            gate: "judge" as DiodeGate,
+            rubric: "Is this answer factually well-grounded? Reply YES or NO.",
+            onFail: "block" as DiodeOnFail,
+            onChangeGate: (g: DiodeGate) => onChangeDiodeField(id, { gate: g }),
+            onChangePattern: (p: string) => onChangeDiodeField(id, { pattern: p }),
+            onChangeRubric: (r: string) => onChangeDiodeField(id, { rubric: r }),
+            onChangeOnFail: (m: DiodeOnFail) => onChangeDiodeField(id, { onFail: m }),
+          },
+        },
+      ];
+    });
+  };
+
+  const addTransformer = () => {
+    const id = `t${Date.now().toString(36)}`;
+    setNodes((ns) => {
+      const maxX = ns.reduce((m, n) => Math.max(m, n.position?.x ?? 0), -Infinity);
+      const x = ns.length === 0 ? 80 : maxX + 240;
+      const y = 160 + (ns.length % 2 === 0 ? 0 : 40);
+      return [
+        ...ns,
+        {
+          id,
+          type: "transformerNode",
+          position: { x, y },
+          data: {
+            kind: "transformer",
+            instruction: "Reformat the following text as a clear bulleted list.",
+            modelId: "@cf/meta/llama-3.1-8b-instruct",
+            onChangeInstruction: (s: string) => onChangeTransformerField(id, { instruction: s }),
+            onChangeModel: (mid: string) => onChangeTransformerField(id, { modelId: mid }),
+          },
+        },
+      ];
+    });
+  };
+
+  const addGround = () => {
+    const id = `g${Date.now().toString(36)}`;
+    setNodes((ns) => {
+      const maxX = ns.reduce((m, n) => Math.max(m, n.position?.x ?? 0), -Infinity);
+      const x = ns.length === 0 ? 80 : maxX + 240;
+      const y = 160 + (ns.length % 2 === 0 ? 0 : 40);
+      return [
+        ...ns,
+        {
+          id,
+          type: "groundNode",
+          position: { x, y },
+          data: { kind: "ground" },
         },
       ];
     });
@@ -434,6 +580,24 @@ function Inner() {
         },
       ];
     });
+  };
+
+  const onCompare = async () => {
+    setComparing(true);
+    setCompareRows(null);
+    const circuit = flowToCircuit(nodes, edges);
+    const capIds = circuit.nodes.filter((n) => n.kind === "capacitor").map((n) => n.id);
+    const capStates = loadAllCapStates(capIds);
+    const seedMap: Record<string, string> = {};
+    for (const s of seeds) seedMap[s.slug] = s.body;
+    const modes: CircuitMode[] = ["physics", "refine-vote", "chain-ensemble"];
+    const results = await Promise.all(
+      modes.map((m) =>
+        runCircuit({ circuit, mode: m, prompt, capStates, seeds: seedMap }, undefined, cfCreds ?? undefined)
+      )
+    );
+    setCompareRows(modes.map((m, i) => ({ mode: m, response: results[i]! })));
+    setComparing(false);
   };
 
   const onRun = async () => {
@@ -478,6 +642,17 @@ function Inner() {
           <button onClick={copyShareLink} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
             <span className="mr-1.5 text-stone-300 dark:text-stone-700">⎘</span>Share link
             {shareMsg && <span className="ml-1 text-[10px] text-emerald-500">{shareMsg}</span>}
+          </button>
+          <button
+            onClick={() => {
+              const c = flowToCircuit(nodes, edges);
+              const name = window.prompt("MCP tool name (no spaces)", "llm-circuit") || "llm-circuit";
+              const desc = window.prompt("Description", "Custom LLM circuit") || "Custom LLM circuit";
+              downloadMcpToolSpec(exportAsMcpTool(c, name.trim().replace(/\s+/g, "-"), desc));
+            }}
+            className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+          >
+            <span className="mr-1.5 text-stone-300 dark:text-stone-700">⤓</span>Export as MCP tool
           </button>
           <button onClick={resetEverything} className="w-full rounded px-2 py-1.5 text-left text-xs text-rose-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-rose-600 dark:hover:bg-stone-900 dark:hover:text-rose-400">
             <span className="mr-1.5">⟲</span>Reset
@@ -543,6 +718,21 @@ function Inner() {
         </div>
 
         <div className="sidebar-section">
+          <SectionHeader label="Gates / Reformat / Sink" />
+          <div className="flex flex-col gap-0.5">
+            <button onClick={addDiode} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-rose-400">
+              <span className="mr-1 text-rose-400 opacity-60">▷|</span>Diode
+            </button>
+            <button onClick={addTransformer} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-amber-50 hover:text-amber-700 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-amber-400">
+              <span className="mr-1 text-amber-400 opacity-60">⊜</span>Transformer
+            </button>
+            <button onClick={addGround} className="w-full rounded px-2 py-1.5 text-left text-xs text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+              <span className="mr-1 text-stone-400 opacity-60">⏚</span>Ground
+            </button>
+          </div>
+        </div>
+
+        <div className="sidebar-section">
           <SectionHeader label="Mode" />
           <div role="radiogroup" aria-label="Execution mode" className="flex flex-col gap-1">
             {MODES.map((m) => (
@@ -572,7 +762,7 @@ function Inner() {
       </aside>
 
       {/* Canvas */}
-      <div className="relative min-h-[520px] h-[calc(100vh-220px)] max-h-[900px] overflow-hidden rounded-md border border-stone-200 bg-[#faf9f6] shadow-sm dark:border-stone-800 dark:bg-stone-950">
+      <div className={`relative ${isMobile ? "min-h-[420px] h-[60vh]" : "min-h-[520px] h-[calc(100vh-220px)]"} max-h-[1200px] overflow-hidden rounded-md border border-stone-200 bg-[#faf9f6] shadow-sm dark:border-stone-800 dark:bg-stone-950`}>
         {nodes.length === 0 && (
           <div className="canvas-empty-hint">
             <div className="canvas-empty-hint__symbol">⊡—⊡</div>
@@ -618,7 +808,7 @@ function Inner() {
 
         <button
           onClick={onRun}
-          disabled={running}
+          disabled={running || comparing}
           className={`relative w-full rounded px-3 py-2.5 font-bold tracking-wide text-white transition-all ${
             running ? "cursor-not-allowed bg-[#e5741a]" : "bg-[#f6821f] hover:bg-[#e5741a] active:scale-[0.98]"
           }`}
@@ -637,6 +827,24 @@ function Inner() {
           </span>
         </button>
 
+        <button
+          onClick={onCompare}
+          disabled={running || comparing}
+          className="w-full rounded border border-stone-300 bg-white px-3 py-1.5 text-[11px] font-bold tracking-wide text-stone-700 transition-colors hover:border-[#f6821f] hover:text-[#f6821f] disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+        >
+          {comparing ? "Comparing 3 modes…" : "⇅ Compare 3 modes"}
+        </button>
+
+        {compareRows && (
+          <div>
+            <h4 className="mb-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-600">
+              <span className="inline-block h-px w-3 bg-amber-400" />
+              Mode comparison
+            </h4>
+            <CompareTable rows={compareRows} />
+          </div>
+        )}
+
         {response?.error && (
           <div className="rounded bg-rose-50 p-2 text-xs text-rose-600 dark:bg-rose-950 dark:text-rose-300">{response.error}</div>
         )}
@@ -648,6 +856,34 @@ function Inner() {
               <span className="stat-callout__value">{response.rTotal.toFixed(1)}</span>
               <span className="stat-callout__unit">Ω</span>
             </div>
+          </div>
+        )}
+
+        {response?.telemetry && (
+          <div className="grid grid-cols-3 gap-2 rounded border border-stone-200 bg-stone-50 p-2 text-[10px] dark:border-stone-800 dark:bg-stone-900">
+            <div>
+              <div className="text-stone-400 dark:text-stone-600">calls</div>
+              <div className="tabular-nums font-bold text-stone-800 dark:text-stone-100">{response.telemetry.calls}</div>
+            </div>
+            <div>
+              <div className="text-stone-400 dark:text-stone-600">total ms</div>
+              <div className="tabular-nums font-bold text-stone-800 dark:text-stone-100">{response.telemetry.ms}</div>
+            </div>
+            <div>
+              <div className="text-stone-400 dark:text-stone-600">{response.telemetry.gatewayUsed ? "cached" : "gateway"}</div>
+              <div className="tabular-nums font-bold text-stone-800 dark:text-stone-100">
+                {response.telemetry.gatewayUsed ? `${response.telemetry.cached}/${response.telemetry.calls}` : "off"}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {response?.evalResult && (
+          <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            <span className="rounded bg-amber-200 px-1.5 py-0.5 font-bold tabular-nums dark:bg-amber-800">
+              {response.evalResult.score}/10
+            </span>
+            <span className="flex-1 leading-snug">{response.evalResult.rationale || "(no rationale)"}</span>
           </div>
         )}
 

@@ -10,7 +10,6 @@ interface Envelope {
 }
 
 function toBase64Url(s: string): string {
-  if (typeof window === "undefined") return Buffer.from(s, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   const utf8 = new TextEncoder().encode(s);
   let bin = "";
   for (const b of utf8) bin += String.fromCharCode(b);
@@ -19,7 +18,6 @@ function toBase64Url(s: string): string {
 
 function fromBase64Url(s: string): string {
   const padded = s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4);
-  if (typeof window === "undefined") return Buffer.from(padded, "base64").toString("utf-8");
   const bin = atob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);

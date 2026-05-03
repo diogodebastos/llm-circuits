@@ -17,13 +17,35 @@ export interface RunRequest {
 export interface NodeTrace {
   nodeId: string;
   modelId?: string;
-  kind?: "model" | "capacitor" | "inductor";
+  kind?: "model" | "capacitor" | "inductor" | "diode" | "transformer" | "ground";
   status: "pending" | "running" | "done" | "error";
   prompt?: string;
   output?: string;
   error?: string;
   R?: number;
   maxTokens?: number;
+}
+
+export interface CallTelemetryEntry {
+  model: string;
+  ms: number;
+  cached?: boolean;
+  neurons?: number;
+  logId?: string;
+}
+
+export interface RunTelemetry {
+  calls: number;
+  ms: number;
+  cached: number;
+  gatewayUsed: boolean;
+  perCall: CallTelemetryEntry[];
+}
+
+export interface EvalResult {
+  score: number;
+  rationale: string;
+  goldenCapId: string;
 }
 
 export interface RunResponse {
@@ -33,6 +55,8 @@ export interface RunResponse {
   trace: NodeTrace[];
   capStates?: Record<string, string>;
   error?: string;
+  telemetry?: RunTelemetry;
+  evalResult?: EvalResult;
 }
 
 export async function runCircuit(
